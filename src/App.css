@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+  background-color: #f4f5f7;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: #f4f5f7;
+  color: #1f2937;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TipTap editor */
+.tiptap-editor {
+  outline: none;
+  min-height: 300px;
+  padding: 1rem;
+}
+
+.tiptap-editor > * + * {
+  margin-top: 0.5em;
+}
+
+/* Scene heading */
+.scene-heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #a78bfa;
+  padding: 0.4rem 0.6rem;
+  background: rgba(167, 139, 250, 0.1);
+  border-radius: 4px;
+  margin: 1rem 0 0.5rem;
+}
+
+/* Dialogue */
+.dialogue-node {
+  border-left: 3px solid;
+  padding: 0.3rem 0.75rem;
+  margin: 0.4rem 0;
+}
+
+.dialogue-character {
+  font-weight: 700;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  margin-bottom: 0.1rem;
+}
+
+/* Narration */
+.narration-node {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 0.3rem 2rem;
+}
+
+/* Stage direction */
+.stage-direction-node {
+  color: #6b7280;
+  font-style: italic;
+  padding: 0.2rem 1rem;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+/* Slash menu */
+.slash-menu {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-menu-item:hover,
+.slash-menu-item.active {
+  background: #e0e7ff;
+}
+
+@keyframes node-bounce-anim {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.15); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.node-bounce {
+  animation: node-bounce-anim 0.4s ease;
+}
+
+/* Input / button resets */
+input, textarea, button, select {
+  font-family: inherit;
+  font-size: inherit;
+}
