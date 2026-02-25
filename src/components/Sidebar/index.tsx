@@ -52,31 +52,38 @@ export default function Sidebar() {
   };
 
   const handleCreateWork = async () => {
-    if (!newWorkTitle.trim()) return;
-    await createWork(newWorkTitle.trim());
+    const title = newWorkTitle.trim();
+    if (!title) return;
     setNewWorkTitle('');
     setNewWorkInput(false);
+    await createWork(title);
   };
 
   const handleCreateEpisode = async () => {
-    if (!newEpisodeWorkId || !newEpisodeTitle.trim()) return;
-    await createEpisode(newEpisodeWorkId, newEpisodeTitle.trim());
+    const workId = newEpisodeWorkId;
+    const title = newEpisodeTitle.trim();
+    if (!workId || !title) return;
     setNewEpisodeTitle('');
     setNewEpisodeWorkId(null);
+    await createEpisode(workId, title);
   };
 
   const handleCreatePlot = async () => {
-    if (!newPlotEpisodeId || !newPlotTitle.trim()) return;
-    await createPlot(newPlotEpisodeId, newPlotTitle.trim());
+    const episodeId = newPlotEpisodeId;
+    const title = newPlotTitle.trim();
+    if (!episodeId || !title) return;
     setNewPlotTitle('');
     setNewPlotEpisodeId(null);
+    await createPlot(episodeId, title);
   };
 
   const handleCreateCharacter = async () => {
-    if (!selectedWorkId || !newCharName.trim()) return;
-    await createCharacter(selectedWorkId, newCharName.trim(), newCharColor);
+    const workId = selectedWorkId;
+    const name = newCharName.trim();
+    if (!workId || !name) return;
     setNewCharName('');
     setShowNewChar(false);
+    await createCharacter(workId, name, newCharColor);
   };
 
   return (
