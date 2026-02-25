@@ -149,8 +149,8 @@ export default function CharacterDetail() {
                 }}
               />
             ))}
-            <button
-              className="w-6 h-6 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0"
+            <label
+              className="w-6 h-6 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0 cursor-pointer"
               style={{
                 borderColor: !PRESET_COLORS.includes(color) ? 'white' : 'transparent',
                 transform: !PRESET_COLORS.includes(color) ? 'scale(1.2)' : 'scale(1)',
@@ -164,7 +164,7 @@ export default function CharacterDetail() {
                 onChange={(e) => { setColor(e.target.value); setIsDirty(true); }}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
-            </button>
+            </label>
           </div>
         </div>
 

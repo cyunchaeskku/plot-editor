@@ -347,8 +347,8 @@ export default function Sidebar() {
                       }}
                     />
                   ))}
-                  <button
-                    className="w-5 h-5 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0"
+                  <label
+                    className="w-5 h-5 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0 cursor-pointer"
                     style={{
                       borderColor: !PRESET_COLORS.includes(newCharColor) ? 'white' : 'transparent',
                       transform: !PRESET_COLORS.includes(newCharColor) ? 'scale(1.2)' : 'scale(1)',
@@ -362,7 +362,7 @@ export default function Sidebar() {
                       onChange={(e) => setNewCharColor(e.target.value)}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
-                  </button>
+                  </label>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={handleCreateCharacter} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded">추가</button>
