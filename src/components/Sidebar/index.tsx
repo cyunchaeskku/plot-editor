@@ -33,6 +33,13 @@ export default function Sidebar() {
   const [newCharColor, setNewCharColor] = useState(PRESET_COLORS[0]);
   const [showNewChar, setShowNewChar] = useState(false);
 
+  const pickDefaultCharColor = () => {
+    const usedColors = new Set((characters[selectedWorkId ?? -1] || []).map((c) => c.color));
+    const unused = PRESET_COLORS.filter((c) => !usedColors.has(c));
+    const pool = unused.length > 0 ? unused : PRESET_COLORS;
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
+
   useEffect(() => {
     loadWorks();
   }, []);
@@ -308,7 +315,7 @@ export default function Sidebar() {
             <div className="flex items-center justify-between px-3 py-2">
               <span className="font-semibold text-gray-300">등장인물</span>
               <button
-                onClick={() => setShowNewChar(true)}
+                onClick={() => { setNewCharColor(pickDefaultCharColor()); setShowNewChar(true); }}
                 className="text-gray-500 hover:text-indigo-400 text-lg leading-none"
               >+</button>
             </div>
@@ -340,6 +347,22 @@ export default function Sidebar() {
                       }}
                     />
                   ))}
+                  <button
+                    className="w-5 h-5 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0"
+                    style={{
+                      borderColor: !PRESET_COLORS.includes(newCharColor) ? 'white' : 'transparent',
+                      transform: !PRESET_COLORS.includes(newCharColor) ? 'scale(1.2)' : 'scale(1)',
+                      background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)',
+                    }}
+                    title="직접 선택"
+                  >
+                    <input
+                      type="color"
+                      value={newCharColor}
+                      onChange={(e) => setNewCharColor(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </button>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={handleCreateCharacter} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded">추가</button>

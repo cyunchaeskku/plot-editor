@@ -149,13 +149,22 @@ export default function CharacterDetail() {
                 }}
               />
             ))}
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => { setColor(e.target.value); setIsDirty(true); }}
-              className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+            <button
+              className="w-6 h-6 rounded-full border-2 transition-transform relative overflow-hidden flex-shrink-0"
+              style={{
+                borderColor: !PRESET_COLORS.includes(color) ? 'white' : 'transparent',
+                transform: !PRESET_COLORS.includes(color) ? 'scale(1.2)' : 'scale(1)',
+                background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)',
+              }}
               title="직접 선택"
-            />
+            >
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => { setColor(e.target.value); setIsDirty(true); }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </button>
           </div>
         </div>
 
