@@ -22,6 +22,23 @@ function extractText(node: any): string {
 async function exportDocx(plotGroups: { title: string; plots: Plot[] }[]) {
   const children: Paragraph[] = [];
 
+  let maxNameLen = 0;
+  for (const group of plotGroups) {
+    for (const plot of group.plots) {
+      try {
+        const content = JSON.parse(plot.content);
+        if (!content.content) continue;
+        for (const node of content.content) {
+          if (node.type === 'dialogue') {
+            const name: string = node.attrs?.characterName || '';
+            if (name.length > maxNameLen) maxNameLen = name.length;
+          }
+        }
+      } catch {}
+    }
+  }
+  const TAB_POSITION = Math.max(900, maxNameLen * 120 + 200);
+
   for (const group of plotGroups) {
     children.push(
       new Paragraph({
@@ -74,7 +91,7 @@ async function exportDocx(plotGroups: { title: string; plots: Plot[] }[]) {
                   new TextRun({ text: `${node.attrs?.characterName || ''}\t`, bold: true }),
                   new TextRun({ text: `: ${extractText(node)}` }),
                 ],
-                tabStops: [{ type: TabStopType.LEFT, position: 1440 }],
+                tabStops: [{ type: TabStopType.LEFT, position: TAB_POSITION }],
                 spacing: { after: 120 },
               }));
               break;
