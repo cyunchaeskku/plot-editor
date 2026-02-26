@@ -25,6 +25,19 @@ Tauri를 통해 네이티브 데스크탑 바이너리로도 패키징할 수 �
 
 ---
 
+## 클라우드 동기화 (선택 사항)
+
+`backend/` 디렉터리에 **FastAPI 백엔드**가 포함되어 있습니다. 로컬 SQLite와 병행하여 AWS DynamoDB + S3에 데이터를 미러링합니다.
+
+- **인증**: AWS Cognito OIDC (Google 로그인 등 외부 IdP 연동 가능)
+- **메타데이터**: DynamoDB 6개 테이블 (works / episodes / plots / characters / character_relations / graph_layouts)
+- **대본 본문**: S3 버킷 (`plot-editor-contents`) — TipTap JSON을 `plots/{sub}/{plot_id}.json` 키로 저장
+- **이중 저장**: 백엔드가 없어도 로컬 SQLite로 완전히 동작, 서버가 켜진 경우에만 클라우드 동기화
+
+백엔드 실행 방법은 [백엔드 실행](#백엔드-실행) 섹션을 참고하세요.
+
+---
+
 ## 주요 기능
 
 ### 작품 관리
@@ -165,6 +178,41 @@ Left Sidebar       │  Middle Panel        │  Right Panel
 | 문서 내보내기 | docx | 9 |
 | 이미지 내보내기 | html-to-image | 1 |
 | 데스크탑 래퍼 | Tauri | v2 |
+
+---
+
+## 백엔드 실행
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# .env 파일 작성 (아래 참고)
+python main.py   # localhost:8000
+```
+
+### 환경변수 (`backend/.env`, gitignore 처리됨)
+
+```dotenv
+SECRET_KEY=<임의의 긴 랜덤 문자열>
+
+# AWS Cognito
+COGNITO_REGION=ap-northeast-2
+COGNITO_USER_POOL_ID=ap-northeast-2_XXXXXXXXX
+COGNITO_CLIENT_ID=<앱 클라이언트 ID>
+COGNITO_CLIENT_SECRET=<앱 클라이언트 시크릿>
+COGNITO_DOMAIN=https://<your-domain>.auth.ap-northeast-2.amazoncognito.com
+
+REDIRECT_URI=http://localhost:8000/authorize
+LOGOUT_URI=http://localhost:1420
+FRONTEND_URL=http://localhost:1420
+
+# AWS 자격증명
+AWS_ACCESS_KEY_ID=<IAM 액세스 키>
+AWS_SECRET_ACCESS_KEY=<IAM 시크릿 키>
+S3_BUCKET=plot-editor-contents
+```
 
 ---
 
@@ -343,5 +391,6 @@ plot_editor/
 
 | 날짜 | 주요 내용 |
 |---|---|
-| 2026-02-25 | 초기 Tauri v2 마이그레이션, IndexedDB 전환, 기본 3패널 구현 |
+| 2026-02-25 | 초기 Tauri v2 마이그레이션, SQLite 전환, 기본 3패널 구현 |
 | 2026-02-26 | 소설 모드(novel) 추가, 기획서 패널, 관계도 PNG 내보내기, 줄 번호 표시, DOCX 서식 개선 |
+| 2026-02-27 | FastAPI 백엔드, Cognito OIDC 인증, DynamoDB + S3 클라우드 동기화, GraphView 레이아웃 저장 |

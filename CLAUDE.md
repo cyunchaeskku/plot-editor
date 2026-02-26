@@ -88,6 +88,52 @@ Permissions are declared in `src-tauri/capabilities/default.json`. **Adding a ne
 
 `noUnusedLocals` and `noUnusedParameters` are disabled in `tsconfig.json` to avoid React import false positives.
 
+### Backend
+
+`backend/main.py` — FastAPI server (Python). Run with `python main.py` (port 8000).
+
+Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.md for env var list.
+
+**Authentication**: Cognito OIDC via `authlib`. Session stored in `starlette SessionMiddleware`. `_require_login(request)` helper returns the user's Cognito `sub` or raises HTTP 401.
+
+**Endpoints** (17 total):
+
+| Group | Method + Path | Notes |
+|---|---|---|
+| Auth | `GET /login` | Redirect to Cognito Hosted UI |
+| Auth | `GET /authorize` | OAuth callback; writes user to DynamoDB `users` |
+| Auth | `GET /me` | Return `{sub, email}` |
+| Auth | `GET /logout` | Clear session + redirect to Cognito logout |
+| Works | `GET/POST /works` | List / create |
+| Works | `PUT/DELETE /works/{id}` | Update / delete |
+| Episodes | `GET/POST /works/{id}/episodes` | List / create |
+| Episodes | `PUT/DELETE /episodes/{id}` | Update / delete |
+| Plots | `GET/POST /episodes/{id}/plots` | List / create |
+| Plots | `PUT/DELETE /plots/{id}` | Update meta / delete (also deletes S3 object) |
+| Plots | `PUT /plots/{id}/content` | Save TipTap JSON to S3 |
+| Plots | `GET /plots/{id}/content` | Read TipTap JSON from S3 |
+| Characters | `GET/POST /works/{id}/characters` | List / create |
+| Characters | `PUT/DELETE /characters/{id}` | Update / delete |
+| Relations | `GET/POST /works/{id}/relations` | List / create |
+| Relations | `DELETE /relations/{id}` | Delete |
+| Graph | `GET/PUT /graph-layout/{workId}` | Node positions `{charId: {x,y}}` |
+
+### Cloud Sync
+
+Local SQLite and DynamoDB/S3 follow a **dual-write** pattern:
+- App works fully offline via SQLite (Tauri appdir `ploteditor.db`).
+- When the backend is running, writes are mirrored to the cloud fire-and-forget.
+
+**DynamoDB PK design**: All table PKs use `{Cognito sub}#{local SQLite id}` — e.g. `plot_id: "abc123#42"`. This namespaces data per user without separate tables.
+
+**S3 content storage**: TipTap JSON is stored at key `plots/{sub}/{plot_id}.json` in bucket `plot-editor-contents`. DynamoDB `plots` item stores `content_s3_key` pointer and `updated_at`.
+
+**Frontend integration**:
+- `Editor/index.tsx`: After the 500ms SQLite debounce save, fires `PUT /plots/{id}/content` to S3 (fire-and-forget, errors silently ignored).
+- `GraphView/index.tsx`: On mount, fetches `GET /graph-layout/{workId}` to restore node positions. On `onNodeDragStop`, debounces 1 s then calls `PUT /graph-layout/{workId}`.
+
+All fetch calls include `credentials: 'include'` for session cookie forwarding from the Tauri webview.
+
 ## Work Log
 
 Daily development notes are kept in `work_log/YYYY-MM-DD.md`. See `work_log/README.md` for the format.
