@@ -4,23 +4,38 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function getDb(): Promise<IDBPDatabase> {
   if (!dbPromise) {
-    dbPromise = openDB('plotEditorDB', 1, {
-      upgrade(db) {
-        const works = db.createObjectStore('works', { keyPath: 'id', autoIncrement: true });
-        works.createIndex('created_at', 'created_at');
+    dbPromise = openDB('plotEditorDB', 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const works = db.createObjectStore('works', { keyPath: 'id', autoIncrement: true });
+          works.createIndex('created_at', 'created_at');
 
-        const episodes = db.createObjectStore('episodes', { keyPath: 'id', autoIncrement: true });
-        episodes.createIndex('work_id', 'work_id');
+          const episodes = db.createObjectStore('episodes', { keyPath: 'id', autoIncrement: true });
+          episodes.createIndex('work_id', 'work_id');
 
-        const plots = db.createObjectStore('plots', { keyPath: 'id', autoIncrement: true });
-        plots.createIndex('episode_id', 'episode_id');
+          const plots = db.createObjectStore('plots', { keyPath: 'id', autoIncrement: true });
+          plots.createIndex('episode_id', 'episode_id');
 
-        const characters = db.createObjectStore('characters', { keyPath: 'id', autoIncrement: true });
-        characters.createIndex('work_id', 'work_id');
+          const characters = db.createObjectStore('characters', { keyPath: 'id', autoIncrement: true });
+          characters.createIndex('work_id', 'work_id');
 
-        const relations = db.createObjectStore('characterRelations', { keyPath: 'id', autoIncrement: true });
-        relations.createIndex('from_character_id', 'from_character_id');
+          const relations = db.createObjectStore('characterRelations', { keyPath: 'id', autoIncrement: true });
+          relations.createIndex('from_character_id', 'from_character_id');
+        }
+        // v2: add 'type' field to existing works (handled after upgrade via migrateWorksType)
       },
+    });
+    // Migrate existing works that lack a 'type' field
+    dbPromise.then(async (db) => {
+      const tx = db.transaction('works', 'readwrite');
+      const store = tx.objectStore('works');
+      const allWorks = await store.getAll();
+      for (const work of allWorks) {
+        if (!(work as any).type) {
+          await store.put({ ...work, type: 'plot' });
+        }
+      }
+      await tx.done;
     });
   }
   return dbPromise;
@@ -33,14 +48,22 @@ export async function getWorks(): Promise<Work[]> {
   return all.sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-export async function createWork(title: string): Promise<number> {
+export async function createWork(title: string, type: WorkType = 'plot'): Promise<number> {
   const db = await getDb();
   const id = await db.add('works', {
     title,
+    type,
     created_at: new Date().toISOString(),
     planning_doc: '',
   } as Omit<Work, 'id'>);
   return id as number;
+}
+
+export async function updateWorkType(id: number, type: WorkType): Promise<void> {
+  const db = await getDb();
+  const work = await db.get('works', id) as Work;
+  if (!work) return;
+  await db.put('works', { ...work, type });
 }
 
 export async function updateWork(id: number, title: string): Promise<void> {
@@ -106,6 +129,13 @@ export async function updateEpisode(id: number, title: string): Promise<void> {
   const ep = await db.get('episodes', id) as Episode;
   if (!ep) return;
   await db.put('episodes', { ...ep, title });
+}
+
+export async function updateEpisodeOrder(id: number, orderIndex: number): Promise<void> {
+  const db = await getDb();
+  const ep = await db.get('episodes', id) as Episode;
+  if (!ep) return;
+  await db.put('episodes', { ...ep, order_index: orderIndex });
 }
 
 export async function deleteEpisode(id: number): Promise<void> {
@@ -248,9 +278,12 @@ export async function deleteRelation(id: number): Promise<void> {
 }
 
 // Types
+export type WorkType = 'plot' | 'novel';
+
 export interface Work {
   id: number;
   title: string;
+  type: WorkType;
   created_at: string;
   planning_doc?: string;
 }

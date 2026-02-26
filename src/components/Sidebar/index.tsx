@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import sidebarCollapseIcon from '../../assets/sidebar_collapse_icon.svg';
 import { useStore } from '../../store';
+import type { WorkType } from '../../db';
 
 const PRESET_COLORS = [
   '#6366f1', '#ec4899', '#f59e0b', '#10b981',
@@ -13,7 +14,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     selectedWorkId, selectedEpisodeId, selectedPlotIds,
     expandedWorkIds, expandedEpisodeIds,
     loadWorks,
-    createWork, updateWork, deleteWork,
+    createWork, updateWork, updateWorkType, deleteWork,
     createEpisode, updateEpisode, deleteEpisode,
     createPlot, deletePlot,
     createCharacter, deleteCharacter,
@@ -26,6 +27,8 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
   const [editingValue, setEditingValue] = useState('');
   const [newWorkInput, setNewWorkInput] = useState(false);
   const [newWorkTitle, setNewWorkTitle] = useState('');
+  const [newWorkType, setNewWorkType] = useState<WorkType>('plot');
+  const [typeMenuWorkId, setTypeMenuWorkId] = useState<number | null>(null);
   const [newEpisodeWorkId, setNewEpisodeWorkId] = useState<number | null>(null);
   const [newEpisodeTitle, setNewEpisodeTitle] = useState('');
   const [newPlotEpisodeId, setNewPlotEpisodeId] = useState<number | null>(null);
@@ -64,7 +67,8 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     if (!title) return;
     setNewWorkTitle('');
     setNewWorkInput(false);
-    await createWork(title);
+    await createWork(title, newWorkType);
+    setNewWorkType('plot');
   };
 
   const handleCreateEpisode = async () => {
@@ -121,19 +125,31 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
       <div className={`flex-1 overflow-y-auto ${sidebarOpen ? '' : 'hidden'}`}>
         {/* New work input */}
         {newWorkInput && (
-          <div className="px-3 py-2 flex gap-1">
-            <input
-              autoFocus
-              value={newWorkTitle}
-              onChange={(e) => setNewWorkTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateWork();
-                if (e.key === 'Escape') { setNewWorkInput(false); setNewWorkTitle(''); }
-              }}
-              placeholder="작품 제목"
-              className="flex-1 bg-gray-800 text-gray-200 rounded px-2 py-1 text-xs outline-none border border-gray-600"
-            />
-            <button onClick={handleCreateWork} className="text-indigo-400 hover:text-indigo-300 text-xs">✓</button>
+          <div className="px-3 py-2 space-y-1.5">
+            <div className="flex gap-1">
+              <input
+                autoFocus
+                value={newWorkTitle}
+                onChange={(e) => setNewWorkTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateWork();
+                  if (e.key === 'Escape') { setNewWorkInput(false); setNewWorkTitle(''); }
+                }}
+                placeholder="작품 제목"
+                className="flex-1 bg-gray-800 text-gray-200 rounded px-2 py-1 text-xs outline-none border border-gray-600"
+              />
+              <button onClick={handleCreateWork} className="text-indigo-400 hover:text-indigo-300 text-xs">✓</button>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setNewWorkType('plot')}
+                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'plot' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >플롯 에디터</button>
+              <button
+                onClick={() => setNewWorkType('novel')}
+                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'novel' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >소설 에디터</button>
+            </div>
           </div>
         )}
 
@@ -172,14 +188,22 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                   />
                 ) : (
                   <span
-                    className="flex-1 text-gray-200 font-medium truncate"
+                    className="flex-1 text-gray-200 font-medium truncate flex items-center gap-1"
                     onDoubleClick={(e) => { e.stopPropagation(); startEdit(`work-${work.id}`, work.title); }}
                   >
-                    {work.title}
+                    <span className={`inline-block px-1 py-0 text-[9px] rounded font-bold flex-shrink-0 ${work.type === 'novel' ? 'bg-emerald-700 text-emerald-200' : 'bg-indigo-700 text-indigo-200'}`}>
+                      {work.type === 'novel' ? 'N' : 'P'}
+                    </span>
+                    <span className="truncate">{work.title}</span>
                   </span>
                 )}
 
-                <div className="hidden group-hover:flex items-center gap-1">
+                <div className="hidden group-hover:flex items-center gap-1 relative">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setTypeMenuWorkId(typeMenuWorkId === work.id ? null : work.id); }}
+                    className="text-gray-500 hover:text-yellow-400 text-xs"
+                    title="타입 변경"
+                  >⇄</button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setNewEpisodeWorkId(work.id); toggleWorkExpand(work.id); }}
                     className="text-gray-500 hover:text-indigo-400 text-xs"
@@ -190,6 +214,18 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                     className="text-gray-500 hover:text-red-400 text-xs"
                     title="삭제"
                   >✕</button>
+                  {typeMenuWorkId === work.id && (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded shadow-lg min-w-[120px]">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateWorkType(work.id, 'plot'); setTypeMenuWorkId(null); }}
+                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-gray-700 ${work.type === 'plot' ? 'text-indigo-400 font-bold' : 'text-gray-300'}`}
+                      >플롯 에디터</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateWorkType(work.id, 'novel'); setTypeMenuWorkId(null); }}
+                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-gray-700 ${work.type === 'novel' ? 'text-emerald-400 font-bold' : 'text-gray-300'}`}
+                      >소설 에디터</button>
+                    </div>
+                  )}
                 </div>
               </div>
 

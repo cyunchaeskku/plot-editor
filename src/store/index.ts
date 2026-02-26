@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Work, Episode, Plot, Character, CharacterRelation } from '../db';
+import type { Work, Episode, Plot, Character, CharacterRelation, WorkType } from '../db';
 import * as db from '../db';
 import { updatePlanningDoc } from '../db';
 
@@ -32,8 +32,9 @@ interface AppState {
   loadCharacters: (workId: number) => Promise<void>;
   loadRelations: (workId: number) => Promise<void>;
 
-  createWork: (title: string) => Promise<void>;
+  createWork: (title: string, type?: WorkType) => Promise<void>;
   updateWork: (id: number, title: string) => Promise<void>;
+  updateWorkType: (id: number, type: WorkType) => Promise<void>;
   deleteWork: (id: number) => Promise<void>;
 
   createEpisode: (workId: number, title: string) => Promise<void>;
@@ -104,13 +105,18 @@ export const useStore = create<AppState>((set, get) => ({
     set({ relations });
   },
 
-  createWork: async (title) => {
-    await db.createWork(title);
+  createWork: async (title, type = 'plot') => {
+    await db.createWork(title, type);
     await get().loadWorks();
   },
 
   updateWork: async (id, title) => {
     await db.updateWork(id, title);
+    await get().loadWorks();
+  },
+
+  updateWorkType: async (id, type) => {
+    await db.updateWorkType(id, type);
     await get().loadWorks();
   },
 
