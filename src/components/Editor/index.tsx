@@ -48,9 +48,26 @@ export default function Editor() {
   const [activePlotId, setActivePlotId] = useState<number | null>(null);
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({ visible: false, position: { top: 0, left: 0 } });
   const [showDialogueMenu, setShowDialogueMenu] = useState(false);
+  const [lineNumbers, setLineNumbers] = useState<{ top: number; line: number }[]>([]);
   const dialogueMenuRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(false);
+
+  const updateLineNumbers = useCallback(() => {
+    if (!editorContainerRef.current) return;
+    const editorEl = editorContainerRef.current.querySelector('.tiptap-editor');
+    if (!editorEl) return;
+    const blocks = Array.from(editorEl.children);
+    const result: { top: number; line: number }[] = [];
+    blocks.forEach((block, i) => {
+      const lineNum = i + 1;
+      if (lineNum % 5 === 0) {
+        result.push({ top: (block as HTMLElement).offsetTop, line: lineNum });
+      }
+    });
+    setLineNumbers(result);
+  }, []);
 
   useEffect(() => {
     if (!showDialogueMenu) return;
@@ -153,6 +170,15 @@ export default function Editor() {
       loadPlotContent(activePlotContent);
     }
   }, [activePlotContent]);
+
+  // Subscribe to editor updates for line numbers
+  useEffect(() => {
+    if (!editor) return;
+    const handler = () => setTimeout(updateLineNumbers, 0);
+    editor.on('update', handler);
+    handler();
+    return () => { editor.off('update', handler); };
+  }, [editor, updateLineNumbers]);
 
   // Set active plot to first selected when selection changes
   useEffect(() => {
@@ -291,7 +317,21 @@ export default function Editor() {
 
       {/* Editor content */}
       <div className="flex-1 overflow-y-auto" onKeyDown={handleKeyDown}>
-        <EditorContent editor={editor} className="h-full" />
+        <div ref={editorContainerRef} className="relative">
+          {/* Line number gutter */}
+          <div className="absolute top-0 left-0 w-10 pointer-events-none select-none">
+            {lineNumbers.map(({ top, line }) => (
+              <div
+                key={line}
+                style={{ position: 'absolute', top }}
+                className="text-xs text-gray-500 text-right pr-2 leading-6 w-10"
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+          <EditorContent editor={editor} className="h-full" />
+        </div>
       </div>
 
       {/* Slash menu */}

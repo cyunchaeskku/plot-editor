@@ -88,26 +88,27 @@ async function exportDocx(plotGroups: { title: string; plots: Plot[] }[]) {
             case 'dialogue':
               paras.push(new Paragraph({
                 children: [
-                  new TextRun({ text: `${node.attrs?.characterName || ''}\t`, bold: true }),
-                  new TextRun({ text: `: ${extractText(node)}` }),
+                  new TextRun({ text: `${node.attrs?.characterName || ''}     `, bold: true }),
+                  new TextRun({ text: extractText(node) }),
                 ],
-                tabStops: [{ type: TabStopType.LEFT, position: TAB_POSITION }],
                 spacing: { after: 120 },
               }));
               break;
             case 'narration':
+              paras.push(new Paragraph({ children: [] }));
               paras.push(new Paragraph({
                 children: [new TextRun({ text: extractText(node), italics: true, color: '9ca3af' })],
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 120 },
               }));
+              paras.push(new Paragraph({ children: [] }));
               break;
             case 'stageDirection':
+              paras.push(new Paragraph({ children: [] }));
               paras.push(new Paragraph({
                 children: [new TextRun({ text: extractText(node), italics: true, color: '6b7280' })],
                 indent: { left: 360 },
-                spacing: { after: 60 },
               }));
+              paras.push(new Paragraph({ children: [] }));
               break;
             case 'paragraph':
             default:
