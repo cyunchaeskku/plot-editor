@@ -184,6 +184,7 @@ export default function PlanningDoc() {
               editor.isActive('heading', { level: 2 }) ? '2' :
               editor.isActive('heading', { level: 3 }) ? '3' : '0'
             }
+            onMouseDown={(e) => e.preventDefault()}
             onChange={(e) => {
               const val = Number(e.target.value);
               if (val === 0) editor.chain().focus().setParagraph().run();
@@ -243,6 +244,7 @@ export default function PlanningDoc() {
           <input
             type="color"
             defaultValue="#000000"
+            onMouseDown={(e) => e.preventDefault()}
             onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
             title="텍스트 색상"
             style={{ width: 28, height: 28, padding: 2, cursor: 'pointer', borderRadius: 4, border: '1px solid #d1d5db' }}
@@ -250,6 +252,7 @@ export default function PlanningDoc() {
 
           {/* Font size */}
           <select
+            onMouseDown={(e) => e.preventDefault()}
             onChange={(e) => {
               if (!e.target.value) (editor.chain().focus() as any).unsetFontSize().run();
               else (editor.chain().focus() as any).setFontSize(e.target.value).run();
