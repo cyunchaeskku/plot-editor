@@ -70,7 +70,7 @@ export default function App() {
   }, [selectedWorkId]);
 
   return (
-    <div className="flex h-screen bg-[#f4f5f7] text-gray-800 overflow-hidden">
+    <div className="flex h-screen bg-[#faf8f5] text-gray-800 overflow-hidden">
       {/* Left Sidebar */}
       <div className={`${sidebarOpen ? 'w-56' : 'w-8'} flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col transition-all duration-200`}>
         <Sidebar sidebarOpen={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
@@ -95,7 +95,7 @@ export default function App() {
           <button
             onClick={() => setRightPanelMode('editor')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
-              rightPanelMode === 'editor' ? 'bg-indigo-700 text-white' : 'text-gray-500 hover:text-gray-700'
+              rightPanelMode === 'editor' ? 'bg-[#AD1B02] text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {workType === 'novel' ? '📖 에디터' : '✍️ 에디터'}
@@ -103,7 +103,7 @@ export default function App() {
           <button
             onClick={() => setRightPanelMode('character')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
-              rightPanelMode === 'character' ? 'bg-indigo-700 text-white' : 'text-gray-500 hover:text-gray-700'
+              rightPanelMode === 'character' ? 'bg-[#AD1B02] text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             👤 인물 상세
@@ -111,7 +111,7 @@ export default function App() {
           <button
             onClick={() => setRightPanelMode('graph')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
-              rightPanelMode === 'graph' ? 'bg-indigo-700 text-white' : 'text-gray-500 hover:text-gray-700'
+              rightPanelMode === 'graph' ? 'bg-[#AD1B02] text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             🕸️ 관계도
@@ -119,7 +119,7 @@ export default function App() {
           <button
             onClick={() => setRightPanelMode('planning')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
-              rightPanelMode === 'planning' ? 'bg-indigo-700 text-white' : 'text-gray-500 hover:text-gray-700'
+              rightPanelMode === 'planning' ? 'bg-[#AD1B02] text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             📝 기획서

@@ -4,8 +4,8 @@ import { useStore } from '../../store';
 import type { WorkType } from '../../db';
 
 const PRESET_COLORS = [
-  '#6366f1', '#ec4899', '#f59e0b', '#10b981',
-  '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6',
+  '#AD1B02', '#D85604', '#E88D14', '#F3BE26',
+  '#E669A2', '#8B1A00', '#B8621A', '#C4A000',
 ];
 
 export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolean; onToggle: () => void }) {
@@ -99,9 +99,9 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0f0f23] text-sm select-none overflow-hidden">
+    <div className="flex flex-col h-full bg-[#120806] text-sm select-none overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a1208]">
         <button
           onClick={onToggle}
           className="text-gray-500 hover:text-gray-300 flex-shrink-0 flex items-center justify-center"
@@ -115,7 +115,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
             <span className="font-semibold text-gray-300 flex-1 ml-2">작품 목록</span>
             <button
               onClick={() => setNewWorkInput(true)}
-              className="text-gray-500 hover:text-indigo-400 text-lg leading-none"
+              className="text-gray-500 hover:text-[#E88D14] text-lg leading-none"
               title="새 작품"
             >+</button>
           </>
@@ -136,18 +136,18 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                   if (e.key === 'Escape') { setNewWorkInput(false); setNewWorkTitle(''); }
                 }}
                 placeholder="작품 제목"
-                className="flex-1 bg-gray-800 text-gray-200 rounded px-2 py-1 text-xs outline-none border border-gray-600"
+                className="flex-1 bg-[#1e0e08] text-[#f0ddd0] rounded px-2 py-1 text-xs outline-none border border-[#3a1a0a]"
               />
-              <button onClick={handleCreateWork} className="text-indigo-400 hover:text-indigo-300 text-xs">✓</button>
+              <button onClick={handleCreateWork} className="text-[#E88D14] hover:text-[#F3BE26] text-xs">✓</button>
             </div>
             <div className="flex gap-1">
               <button
                 onClick={() => setNewWorkType('plot')}
-                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'plot' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'plot' ? 'bg-[#AD1B02] text-white' : 'bg-[#1e0e08] text-[#c0a090] hover:bg-[#2a1208]'}`}
               >플롯 에디터</button>
               <button
                 onClick={() => setNewWorkType('novel')}
-                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'novel' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${newWorkType === 'novel' ? 'bg-[#E669A2] text-white' : 'bg-[#1e0e08] text-[#c0a090] hover:bg-[#2a1208]'}`}
               >소설 에디터</button>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
             <div key={work.id}>
               {/* Work row */}
               <div
-                className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-gray-800 group ${isSelected ? 'bg-gray-800' : ''}`}
+                className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-[#1e0e08] group ${isSelected ? 'bg-[#1e0e08]' : ''}`}
                 onClick={() => {
                   selectWork(work.id);
                   if (!isExpanded) toggleWorkExpand(work.id);
@@ -183,15 +183,15 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                     onChange={(e) => setEditingValue(e.target.value)}
                     onBlur={commitEdit}
                     onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingId(null); }}
-                    className="flex-1 bg-gray-700 text-gray-200 rounded px-1 py-0.5 text-xs outline-none"
+                    className="flex-1 bg-[#2a1208] text-[#f0ddd0] rounded px-1 py-0.5 text-xs outline-none"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <span
-                    className="flex-1 text-gray-200 font-medium truncate flex items-center gap-1"
+                    className="flex-1 text-[#f0ddd0] font-medium truncate flex items-center gap-1"
                     onDoubleClick={(e) => { e.stopPropagation(); startEdit(`work-${work.id}`, work.title); }}
                   >
-                    <span className={`inline-block px-1 py-0 text-[9px] rounded font-bold flex-shrink-0 ${work.type === 'novel' ? 'bg-emerald-700 text-emerald-200' : 'bg-indigo-700 text-indigo-200'}`}>
+                    <span className={`inline-block px-1 py-0 text-[9px] rounded font-bold flex-shrink-0 ${work.type === 'novel' ? 'bg-[#8a1060] text-[#F3BE26]' : 'bg-[#7a1200] text-[#F3BE26]'}`}>
                       {work.type === 'novel' ? 'N' : 'P'}
                     </span>
                     <span className="truncate">{work.title}</span>
@@ -201,12 +201,12 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                 <div className="hidden group-hover:flex items-center gap-1 relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); setTypeMenuWorkId(typeMenuWorkId === work.id ? null : work.id); }}
-                    className="text-gray-500 hover:text-yellow-400 text-xs"
+                    className="text-gray-500 hover:text-[#F3BE26] text-xs"
                     title="타입 변경"
                   >⇄</button>
                   <button
                     onClick={(e) => { e.stopPropagation(); setNewEpisodeWorkId(work.id); toggleWorkExpand(work.id); }}
-                    className="text-gray-500 hover:text-indigo-400 text-xs"
+                    className="text-gray-500 hover:text-[#E88D14] text-xs"
                     title="에피소드 추가"
                   >+</button>
                   <button
@@ -215,14 +215,14 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                     title="삭제"
                   >✕</button>
                   {typeMenuWorkId === work.id && (
-                    <div className="absolute right-0 top-full mt-1 z-50 bg-gray-800 border border-gray-600 rounded shadow-lg min-w-[120px]">
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-[#1e0e08] border border-[#3a1a0a] rounded shadow-lg min-w-[120px]">
                       <button
                         onClick={(e) => { e.stopPropagation(); updateWorkType(work.id, 'plot'); setTypeMenuWorkId(null); }}
-                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-gray-700 ${work.type === 'plot' ? 'text-indigo-400 font-bold' : 'text-gray-300'}`}
+                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-[#2a1208] ${work.type === 'plot' ? 'text-[#E88D14] font-bold' : 'text-[#e8d0c0]'}`}
                       >플롯 에디터</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); updateWorkType(work.id, 'novel'); setTypeMenuWorkId(null); }}
-                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-gray-700 ${work.type === 'novel' ? 'text-emerald-400 font-bold' : 'text-gray-300'}`}
+                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-[#2a1208] ${work.type === 'novel' ? 'text-[#E669A2] font-bold' : 'text-[#e8d0c0]'}`}
                       >소설 에디터</button>
                     </div>
                   )}
@@ -241,7 +241,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                       <div key={ep.id}>
                         {/* Episode row */}
                         <div
-                          className={`flex items-center gap-1 pl-6 pr-2 py-1.5 cursor-pointer hover:bg-gray-800 group ${isEpSelected ? 'bg-gray-800' : ''}`}
+                          className={`flex items-center gap-1 pl-6 pr-2 py-1.5 cursor-pointer hover:bg-[#1e0e08] group ${isEpSelected ? 'bg-[#1e0e08]' : ''}`}
                           onClick={() => {
                             selectEpisode(ep.id);
                             if (!isEpExpanded) toggleEpisodeExpand(ep.id);
@@ -261,12 +261,12 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                               onChange={(e) => setEditingValue(e.target.value)}
                               onBlur={commitEdit}
                               onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingId(null); }}
-                              className="flex-1 bg-gray-700 text-gray-200 rounded px-1 py-0.5 text-xs outline-none"
+                              className="flex-1 bg-[#2a1208] text-[#f0ddd0] rounded px-1 py-0.5 text-xs outline-none"
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
                             <span
-                              className="flex-1 text-gray-300 truncate"
+                              className="flex-1 text-[#e8d0c0] truncate"
                               onDoubleClick={(e) => { e.stopPropagation(); startEdit(`episode-${ep.id}`, ep.title); }}
                             >
                               {ep.title}
@@ -276,7 +276,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                           <div className="hidden group-hover:flex items-center gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); setNewPlotEpisodeId(ep.id); toggleEpisodeExpand(ep.id); }}
-                              className="text-gray-500 hover:text-indigo-400 text-xs"
+                              className="text-gray-500 hover:text-[#E88D14] text-xs"
                               title="플롯 추가"
                             >+</button>
                             <button
@@ -299,7 +299,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                               return (
                                 <div
                                   key={plot.id}
-                                  className={`flex items-center gap-1 pl-12 pr-2 py-1 cursor-pointer hover:bg-gray-800 group ${isPlotSelected ? 'bg-indigo-900/30 text-indigo-300' : 'text-gray-400'}`}
+                                  className={`flex items-center gap-1 pl-12 pr-2 py-1 cursor-pointer hover:bg-[#1e0e08] group ${isPlotSelected ? 'bg-[#AD1B02]/20 text-[#F3BE26]' : 'text-[#c0a090]'}`}
                                   onClick={(e) => selectPlot(plot.id, e.metaKey || e.ctrlKey)}
                                 >
                                   <span className="text-gray-600 text-xs w-5">P{idx + 1}</span>
@@ -324,9 +324,9 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                                     if (e.key === 'Escape') { setNewPlotEpisodeId(null); setNewPlotTitle(''); }
                                   }}
                                   placeholder="플롯 제목"
-                                  className="flex-1 bg-gray-800 text-gray-200 rounded px-2 py-0.5 text-xs outline-none border border-gray-600"
+                                  className="flex-1 bg-[#1e0e08] text-[#f0ddd0] rounded px-2 py-0.5 text-xs outline-none border border-[#3a1a0a]"
                                 />
-                                <button onClick={handleCreatePlot} className="text-indigo-400 text-xs">✓</button>
+                                <button onClick={handleCreatePlot} className="text-[#E88D14] text-xs">✓</button>
                               </div>
                             )}
                           </div>
@@ -347,9 +347,9 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                           if (e.key === 'Escape') { setNewEpisodeWorkId(null); setNewEpisodeTitle(''); }
                         }}
                         placeholder="에피소드 제목"
-                        className="flex-1 bg-gray-800 text-gray-200 rounded px-2 py-0.5 text-xs outline-none border border-gray-600"
+                        className="flex-1 bg-[#1e0e08] text-[#f0ddd0] rounded px-2 py-0.5 text-xs outline-none border border-[#3a1a0a]"
                       />
-                      <button onClick={handleCreateEpisode} className="text-indigo-400 text-xs">✓</button>
+                      <button onClick={handleCreateEpisode} className="text-[#E88D14] text-xs">✓</button>
                     </div>
                   )}
                 </div>
@@ -360,12 +360,12 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
 
         {/* Characters section */}
         {selectedWorkId && (
-          <div className="mt-4 border-t border-gray-800">
+          <div className="mt-4 border-t border-[#2a1208]">
             <div className="flex items-center justify-between px-3 py-2">
               <span className="font-semibold text-gray-300">등장인물</span>
               <button
                 onClick={() => { setNewCharColor(pickDefaultCharColor()); setShowNewChar(true); }}
-                className="text-gray-500 hover:text-indigo-400 text-lg leading-none"
+                className="text-gray-500 hover:text-[#E88D14] text-lg leading-none"
               >+</button>
             </div>
 
@@ -381,7 +381,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                     if (e.key === 'Escape') setShowNewChar(false);
                   }}
                   placeholder="이름"
-                  className="w-full bg-gray-800 text-gray-200 rounded px-2 py-1 text-xs outline-none border border-gray-600"
+                  className="w-full bg-[#1e0e08] text-[#f0ddd0] rounded px-2 py-1 text-xs outline-none border border-[#3a1a0a]"
                 />
                 <div className="flex gap-1 flex-wrap">
                   {PRESET_COLORS.map((c) => (
@@ -414,7 +414,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                   </label>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleCreateCharacter} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded">추가</button>
+                  <button onClick={handleCreateCharacter} className="text-xs bg-[#AD1B02] text-white px-2 py-1 rounded">추가</button>
                   <button onClick={() => setShowNewChar(false)} className="text-xs text-gray-500">취소</button>
                 </div>
               </div>
@@ -424,14 +424,14 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
             {(characters[selectedWorkId] || []).map((char) => (
               <div
                 key={char.id}
-                className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-800 group ${selectedCharacterId === char.id ? 'bg-gray-800' : ''}`}
+                className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#1e0e08] group ${selectedCharacterId === char.id ? 'bg-[#1e0e08]' : ''}`}
                 onClick={() => selectCharacter(char.id)}
               >
                 <span
                   className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: char.color }}
                 />
-                <span className="flex-1 text-gray-300 text-xs truncate">{char.name}</span>
+                <span className="flex-1 text-[#e8d0c0] text-xs truncate">{char.name}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteCharacter(char.id); }}
                   className="hidden group-hover:block text-gray-600 hover:text-red-400 text-xs"

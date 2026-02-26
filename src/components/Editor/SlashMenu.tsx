@@ -91,12 +91,15 @@ export default function SlashMenu({ editor, position, onClose }: SlashMenuProps)
     if (showCharPicker) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i + 1) % workChars.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i - 1 + workChars.length) % workChars.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         const char = workChars[activeIndex];
         if (char) {
           deleteSlash();
@@ -110,12 +113,15 @@ export default function SlashMenu({ editor, position, onClose }: SlashMenuProps)
     } else {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i + 1) % baseItems.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => (i - 1 + baseItems.length) % baseItems.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         baseItems[activeIndex]?.action();
       } else if (e.key === 'Escape') {
         onClose();

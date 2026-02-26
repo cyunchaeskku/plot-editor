@@ -59,8 +59,8 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
       className={`
         rounded-lg border p-3 cursor-pointer transition-colors mb-2 group
         ${isSelected
-          ? 'border-indigo-500 bg-indigo-900/20'
-          : 'border-gray-700 bg-[#1a1a35] hover:border-gray-600'
+          ? 'border-[#AD1B02] bg-[#AD1B02]/10'
+          : 'border-[#2a1208] bg-[#1c0e08] hover:border-[#3a1a0a]'
         }
       `}
     >
@@ -77,8 +77,8 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-indigo-400">P{index + 1}</span>
-            <span className="text-sm font-medium text-gray-200 truncate flex-1">
+            <span className="text-xs font-bold text-[#E88D14]">P{index + 1}</span>
+            <span className="text-sm font-medium text-[#f0ddd0] truncate flex-1">
               {plot.title || '(제목 없음)'}
             </span>
             <button
@@ -87,7 +87,7 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
             >✕</button>
           </div>
           {preview && (
-            <p className="text-xs text-gray-500 truncate">{preview}</p>
+            <p className="text-xs text-[#8a6050] truncate">{preview}</p>
           )}
         </div>
       </div>
@@ -142,7 +142,7 @@ export default function PlotPanel() {
 
   if (!selectedEpisodeId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+      <div className="flex-1 flex items-center justify-center text-[#6a4030] text-sm">
         <div className="text-center">
           <div className="text-4xl mb-3">📋</div>
           <p>좌측에서 에피소드를 선택하세요</p>
@@ -154,19 +154,19 @@ export default function PlotPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <span className="text-sm font-semibold text-gray-300 truncate">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a1208]">
+        <span className="text-sm font-semibold text-[#e8d0c0] truncate">
           {currentWork ? `${currentWork.title} / 플롯 카드` : '플롯 카드'}
         </span>
         <button
           onClick={() => setShowNewPlot(true)}
-          className="text-sm text-indigo-400 hover:text-indigo-300"
+          className="text-sm text-[#E88D14] hover:text-[#F3BE26]"
         >+ 플롯 추가</button>
       </div>
 
       {/* New plot input */}
       {showNewPlot && (
-        <div className="px-4 py-2 flex gap-2 border-b border-gray-800">
+        <div className="px-4 py-2 flex gap-2 border-b border-[#2a1208]">
           <input
             autoFocus
             value={newPlotTitle}
@@ -176,22 +176,22 @@ export default function PlotPanel() {
               if (e.key === 'Escape') { setShowNewPlot(false); setNewPlotTitle(''); }
             }}
             placeholder="플롯 제목 입력..."
-            className="flex-1 bg-gray-800 text-gray-200 rounded px-3 py-1.5 text-sm outline-none border border-gray-600"
+            className="flex-1 bg-[#1e0e08] text-[#f0ddd0] rounded px-3 py-1.5 text-sm outline-none border border-[#3a1a0a]"
           />
-          <button onClick={handleCreate} className="text-indigo-400 hover:text-indigo-300 text-sm">추가</button>
-          <button onClick={() => setShowNewPlot(false)} className="text-gray-500 text-sm">취소</button>
+          <button onClick={handleCreate} className="text-[#E88D14] hover:text-[#F3BE26] text-sm">추가</button>
+          <button onClick={() => setShowNewPlot(false)} className="text-[#8a6050] text-sm">취소</button>
         </div>
       )}
 
       {/* Plot list */}
       <div className="flex-1 overflow-y-auto p-4">
         {episodePlots.length === 0 ? (
-          <div className="text-center text-gray-600 text-sm mt-8">
+          <div className="text-center text-[#6a4030] text-sm mt-8">
             <div className="text-3xl mb-2">📝</div>
             <p>플롯이 없습니다</p>
             <button
               onClick={() => setShowNewPlot(true)}
-              className="mt-2 text-indigo-400 hover:text-indigo-300 text-xs"
+              className="mt-2 text-[#E88D14] hover:text-[#F3BE26] text-xs"
             >+ 첫 번째 플롯 추가</button>
           </div>
         ) : (

@@ -53,6 +53,7 @@ export default function Editor() {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(false);
+  const isRenumberingRef = useRef(false);
 
   const updateLineNumbers = useCallback(() => {
     if (!editorContainerRef.current) return;
@@ -99,6 +100,32 @@ export default function Editor() {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current) return;
+
+      // 씬 헤딩 자동 번호 재정렬
+      if (isRenumberingRef.current) {
+        isRenumberingRef.current = false;
+        return;
+      }
+      {
+        const { state, view } = editor;
+        const tr = state.tr;
+        let counter = 0;
+        let changed = false;
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === 'sceneHeading') {
+            counter++;
+            if (node.attrs.sceneNumber !== counter) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, sceneNumber: counter });
+              changed = true;
+            }
+          }
+        });
+        if (changed) {
+          isRenumberingRef.current = true;
+          view.dispatch(tr);
+        }
+      }
+
       if (!activePlotId) return;
 
       // Check for slash trigger
@@ -109,9 +136,14 @@ export default function Editor() {
 
       if (textBefore.endsWith('/')) {
         const coords = editor.view.coordsAtPos(selection.from);
+        const menuHeight = 280;
+        const spaceBelow = window.innerHeight - coords.bottom;
+        const menuTop = spaceBelow >= menuHeight + 8
+          ? coords.bottom + 4
+          : coords.top - menuHeight - 4;
         setSlashMenu({
           visible: true,
-          position: { top: coords.bottom + 4, left: coords.left },
+          position: { top: menuTop, left: coords.left },
         });
       } else {
         setSlashMenu((s) => ({ ...s, visible: false }));
@@ -123,6 +155,7 @@ export default function Editor() {
         const content = JSON.stringify(editor.getJSON());
         const activePlot = episodePlots.find((p) => p.id === activePlotId);
         if (activePlot) {
+          prevContentRef.current = content; // 자신의 저장임을 표시 → 스토어 반환값과 일치하면 reload 스킵
           updatePlot(activePlotId, activePlot.title, content);
         }
       }, 500);
