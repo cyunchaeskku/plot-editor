@@ -39,9 +39,14 @@ def _require_login(request: Request) -> str:
 
 app = FastAPI(title="Plot Editor Auth")
 
+_allowed_origins = [o.strip() for o in os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:1420,http://localhost:5173,https://plot-editor.vercel.app",
+).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:1420"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

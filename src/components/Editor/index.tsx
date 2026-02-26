@@ -158,7 +158,7 @@ export default function Editor() {
           prevContentRef.current = content; // 자신의 저장임을 표시 → 스토어 반환값과 일치하면 reload 스킵
           updatePlot(activePlotId, activePlot.title, content); // 로컬 SQLite
           // 클라우드 동기화 (fire-and-forget, 오류 무시)
-          fetch(`http://localhost:8000/plots/${activePlotId}/content`, {
+          fetch(`${import.meta.env.VITE_API_BASE_URL}/plots/${activePlotId}/content`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

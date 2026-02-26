@@ -224,7 +224,7 @@ export default function GraphView() {
   // GraphView 진입 시 저장된 노드 위치 불러오기
   useEffect(() => {
     if (!selectedWorkId) return;
-    fetch(`http://localhost:8000/graph-layout/${selectedWorkId}`, { credentials: 'include' })
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/graph-layout/${selectedWorkId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : {}))
       .then((positions: Record<string, { x: number; y: number }>) => {
         nodePositions.current = positions;
@@ -240,7 +240,7 @@ export default function GraphView() {
       if (layoutSaveTimeout.current) clearTimeout(layoutSaveTimeout.current);
       layoutSaveTimeout.current = setTimeout(() => {
         if (!selectedWorkId) return;
-        fetch(`http://localhost:8000/graph-layout/${selectedWorkId}`, {
+        fetch(`${import.meta.env.VITE_API_BASE_URL}/graph-layout/${selectedWorkId}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },

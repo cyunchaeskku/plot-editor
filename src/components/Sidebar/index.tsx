@@ -26,7 +26,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/me', { credentials: 'include' })
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/me`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data?.email) setUserEmail(data.email); })
       .catch(() => {});
@@ -461,7 +461,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
             </div>
           ) : (
             <button
-              onClick={() => { window.location.href = "http://localhost:8000/login"; }}
+              onClick={() => { window.location.href = `${import.meta.env.VITE_API_BASE_URL}/login`; }}
               className="w-full text-sm text-[#c0a090] hover:text-[#E88D14] py-1 text-left"
             >
               로그인
