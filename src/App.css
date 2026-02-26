@@ -44,10 +44,7 @@ body {
 .planning-editor {
   outline: none;
   min-height: 400px;
-  color: #1f2937;
-}
-.dark .planning-editor {
-  color: #e5e7eb;
+  color: #111827;
 }
 .planning-editor h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
 .planning-editor h2 { font-size: 1.35rem; font-weight: 600; margin-bottom: 0.4rem; }

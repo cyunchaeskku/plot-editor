@@ -94,10 +94,28 @@ function FloatingEdge({ id, source, target, markerEnd, style, label, labelStyle,
   );
 }
 
-function CharacterNode({ data }: { data: { label: string; color: string; properties: [string, string][]; isCenter?: boolean; isBouncing?: boolean } }) {
+function CharacterNode({ data }: {
+  data: {
+    label: string;
+    color: string;
+    properties: [string, string][];
+    isCenter?: boolean;
+    isBouncing?: boolean;
+    isConnectSource?: boolean;
+    isConnectTarget?: boolean;
+  };
+}) {
   const visibleProps = data.properties.slice(0, 3);
   const extra = data.properties.length - 3;
   const size = data.isCenter ? 88 : 72;
+
+  let ringStyle: React.CSSProperties = {};
+  if (data.isConnectSource) {
+    ringStyle = { boxShadow: `0 0 0 3px #6366f1, 0 0 12px 4px #6366f155` };
+  } else if (data.isConnectTarget) {
+    ringStyle = { boxShadow: `0 0 0 3px #10b981, 0 0 8px 2px #10b98133`, cursor: 'pointer' };
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }} className={data.isBouncing ? 'node-bounce' : ''}>
       <div
@@ -117,6 +135,8 @@ function CharacterNode({ data }: { data: { label: string; color: string; propert
           padding: '4px',
           wordBreak: 'keep-all',
           position: 'relative',
+          transition: 'box-shadow 0.2s',
+          ...ringStyle,
         }}
       >
         <Handle type="source" position={Position.Top}    style={{ opacity: 0 }} id="top-s" />
@@ -146,16 +166,45 @@ function CharacterNode({ data }: { data: { label: string; color: string; propert
 const nodeTypes = { characterNode: CharacterNode };
 const edgeTypes = { floating: FloatingEdge };
 
+// ── Context menu shown on single-click ──────────────────────────────────────
+interface NodeMenuState {
+  nodeId: string;
+  x: number;
+  y: number;
+}
+
+// ── Relation name input modal ────────────────────────────────────────────────
+interface RelationModalState {
+  fromId: string;
+  toId: string;
+}
+
 export default function GraphView() {
-  const { selectedWorkId, characters, relations, selectCharacter, works } = useStore();
+  const { selectedWorkId, characters, relations, selectCharacter, setRightPanelMode, createRelation, works } = useStore();
   const graphContainerRef = useRef<HTMLDivElement>(null);
+
+  // Context menu
+  const [nodeMenu, setNodeMenu] = useState<NodeMenuState | null>(null);
+  // "Add relation" mode: we remember the source node id
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  // Modal for naming the new relation
+  const [relationModal, setRelationModal] = useState<RelationModalState | null>(null);
+  const [relationName, setRelationName] = useState('');
 
   const handleExportPng = useCallback(async () => {
     const el = graphContainerRef.current?.querySelector('.react-flow') as HTMLElement | null;
     if (!el) return;
     const workName = works.find((w) => w.id === selectedWorkId)?.title ?? '관계도';
     try {
-      const dataUrl = await toPng(el, { backgroundColor: '#f4f5f7', pixelRatio: 2 });
+      const dataUrl = await toPng(el, {
+        backgroundColor: '#f4f5f7',
+        pixelRatio: 2,
+        filter: (node) => {
+          if ((node as HTMLElement).classList?.contains('react-flow__panel')) return false;
+          if ((node as HTMLElement).classList?.contains('react-flow__attribution')) return false;
+          return true;
+        },
+      });
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `${workName}_관계도.png`;
@@ -164,6 +213,7 @@ export default function GraphView() {
       console.error('PNG export failed:', e);
     }
   }, [selectedWorkId, works]);
+
   const workChars = selectedWorkId ? (characters[selectedWorkId] || []) : [];
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -213,6 +263,18 @@ export default function GraphView() {
     setNodes(initialNodes);
   }, [workChars]);
 
+  // Sync connect-source / connect-target highlights
+  useEffect(() => {
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        isConnectSource: connectingFrom === n.id,
+        isConnectTarget: connectingFrom !== null && connectingFrom !== n.id,
+      },
+    })));
+  }, [connectingFrom]);
+
   useEffect(() => {
     if (!bouncingNodeId) return;
     setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, isBouncing: n.id === bouncingNodeId } })));
@@ -225,11 +287,80 @@ export default function GraphView() {
 
   const handleNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
     setBouncingNodeId(node.id);
+    setNodeMenu(null);
   }, []);
 
+  // Single click handler — show menu OR pick relation target
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    event.stopPropagation();
+
+    // If we're in "connect" mode, this click picks the target
+    if (connectingFrom !== null) {
+      if (connectingFrom === node.id) {
+        // Clicked same node → cancel
+        setConnectingFrom(null);
+        return;
+      }
+      // Open naming modal
+      setRelationModal({ fromId: connectingFrom, toId: node.id });
+      setRelationName('');
+      setConnectingFrom(null);
+      return;
+    }
+
+    // Otherwise show context menu at cursor position relative to container
+    const rect = graphContainerRef.current?.getBoundingClientRect();
+    const x = rect ? event.clientX - rect.left : event.clientX;
+    const y = rect ? event.clientY - rect.top : event.clientY;
+    setNodeMenu({ nodeId: node.id, x, y });
+  }, [connectingFrom]);
+
+  // Double-click still navigates to character detail
   const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setNodeMenu(null);
     selectCharacter(Number(node.id));
   }, [selectCharacter]);
+
+  // Click on canvas background → close menu / cancel connect
+  const handlePaneClick = useCallback(() => {
+    setNodeMenu(null);
+    setConnectingFrom(null);
+  }, []);
+
+  // Menu actions
+  const handleMenuAddRelation = useCallback(() => {
+    if (!nodeMenu) return;
+    setConnectingFrom(nodeMenu.nodeId);
+    setNodeMenu(null);
+  }, [nodeMenu]);
+
+  const handleMenuViewDetail = useCallback(() => {
+    if (!nodeMenu) return;
+    selectCharacter(Number(nodeMenu.nodeId));
+    setRightPanelMode('character');
+    setNodeMenu(null);
+  }, [nodeMenu, selectCharacter, setRightPanelMode]);
+
+  // ESC cancels connect mode
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setConnectingFrom(null);
+        setNodeMenu(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Confirm relation creation
+  const handleConfirmRelation = useCallback(async () => {
+    if (!relationModal) return;
+    const name = relationName.trim();
+    await createRelation(Number(relationModal.fromId), Number(relationModal.toId), name || '관계');
+    setRelationModal(null);
+    setRelationName('');
+  }, [relationModal, relationName, createRelation]);
 
   const edges: Edge[] = useMemo(() => {
     const pairCount: Record<string, number> = {};
@@ -276,16 +407,34 @@ export default function GraphView() {
     );
   }
 
+  const fromCharName = connectingFrom
+    ? workChars.find((c) => String(c.id) === connectingFrom)?.name
+    : null;
+  const modalFromName = relationModal
+    ? workChars.find((c) => String(c.id) === relationModal.fromId)?.name ?? ''
+    : '';
+  const modalToName = relationModal
+    ? workChars.find((c) => String(c.id) === relationModal.toId)?.name ?? ''
+    : '';
+
   return (
-    <div ref={graphContainerRef} className="w-full h-full relative">
+    <div ref={graphContainerRef} className="w-full h-full relative" onClick={() => setNodeMenu(null)}>
       {/* Export PNG button */}
       <button
-        onClick={handleExportPng}
+        onClick={(e) => { e.stopPropagation(); handleExportPng(); }}
         className="absolute top-3 right-3 z-10 px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-600 rounded shadow hover:bg-gray-50 transition-colors"
         title="관계도를 PNG로 내보내기"
       >
         🖼️ PNG 내보내기
       </button>
+
+      {/* Connect mode hint banner */}
+      {connectingFrom && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-indigo-600 text-white text-xs rounded-full shadow-lg pointer-events-none select-none">
+          <span className="font-semibold">{fromCharName}</span>에서 → 관계를 연결할 인물을 클릭하세요 &nbsp;·&nbsp; ESC로 취소
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -293,7 +442,9 @@ export default function GraphView() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeDragStop={handleNodeDragStop}
+        onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onPaneClick={handlePaneClick}
         fitView
         attributionPosition="bottom-right"
         style={{ background: '#f4f5f7' }}
@@ -305,6 +456,75 @@ export default function GraphView() {
           style={{ background: '#e2e8f0' }}
         />
       </ReactFlow>
+
+      {/* Node context menu */}
+      {nodeMenu && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: nodeMenu.y,
+            left: nodeMenu.x,
+            zIndex: 50,
+          }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+        >
+          <button
+            onClick={handleMenuAddRelation}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-2"
+          >
+            <span>🔗</span> 관계 추가
+          </button>
+          <button
+            onClick={handleMenuViewDetail}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center gap-2"
+          >
+            <span>👤</span> 인물 상세 정보
+          </button>
+        </div>
+      )}
+
+      {/* Relation name modal */}
+      {relationModal && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/20"
+          onClick={() => { setRelationModal(null); setConnectingFrom(null); }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl p-6 w-80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-semibold text-gray-800 mb-1">관계 추가</div>
+            <div className="text-xs text-gray-500 mb-4">
+              <span className="font-medium text-indigo-600">{modalFromName}</span>
+              {' → '}
+              <span className="font-medium text-emerald-600">{modalToName}</span>
+            </div>
+            <input
+              autoFocus
+              type="text"
+              placeholder="관계 이름 (예: 친구, 적, 스승)"
+              value={relationName}
+              onChange={(e) => setRelationName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleConfirmRelation();
+                if (e.key === 'Escape') { setRelationModal(null); }
+              }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setRelationModal(null)}
+                className="px-4 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >취소</button>
+              <button
+                onClick={handleConfirmRelation}
+                className="px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >추가</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
