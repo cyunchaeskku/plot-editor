@@ -6,7 +6,7 @@ const PRESET_COLORS = [
   '#3b82f6', '#ef4444', '#8b5cf6', '#14b8a6',
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolean; onToggle: () => void }) {
   const {
     works, episodes, plots, characters,
     selectedWorkId, selectedEpisodeId, selectedPlotIds,
@@ -97,15 +97,24 @@ export default function Sidebar() {
     <div className="flex flex-col h-full bg-[#0f0f23] text-sm select-none overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
-        <span className="font-semibold text-gray-300">작품 목록</span>
         <button
-          onClick={() => setNewWorkInput(true)}
-          className="text-gray-500 hover:text-indigo-400 text-lg leading-none"
-          title="새 작품"
-        >+</button>
+          onClick={onToggle}
+          className="text-gray-500 hover:text-gray-300 text-xs w-4 text-center flex-shrink-0"
+          title={sidebarOpen ? '접기' : '펼치기'}
+        >{sidebarOpen ? '◀' : '▶'}</button>
+        {sidebarOpen && (
+          <>
+            <span className="font-semibold text-gray-300 flex-1 ml-2">작품 목록</span>
+            <button
+              onClick={() => setNewWorkInput(true)}
+              className="text-gray-500 hover:text-indigo-400 text-lg leading-none"
+              title="새 작품"
+            >+</button>
+          </>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto ${sidebarOpen ? '' : 'hidden'}`}>
         {/* New work input */}
         {newWorkInput && (
           <div className="px-3 py-2 flex gap-1">

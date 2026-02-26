@@ -23,7 +23,6 @@ export default function SceneHeadingView({ node, updateAttributes }: ReactNodeVi
           value={location}
           onChange={(e) => updateAttributes({ location: e.target.value })}
           placeholder="장소"
-          size={Math.max(4, location.length || 2)}
           style={{
             background: 'transparent',
             border: 'none',
@@ -31,7 +30,8 @@ export default function SceneHeadingView({ node, updateAttributes }: ReactNodeVi
             color: 'inherit',
             fontSize: 10,
             outline: 'none',
-            minWidth: 40,
+            minWidth: 60,
+            width: Math.max(60, (location.length + 2) * 7) + 'px',
           }}
         />
         <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 8 }}>⏱</span>
@@ -39,7 +39,6 @@ export default function SceneHeadingView({ node, updateAttributes }: ReactNodeVi
           value={time}
           onChange={(e) => updateAttributes({ time: e.target.value })}
           placeholder="시간"
-          size={Math.max(4, time.length || 2)}
           style={{
             background: 'transparent',
             border: 'none',
@@ -47,7 +46,8 @@ export default function SceneHeadingView({ node, updateAttributes }: ReactNodeVi
             color: 'inherit',
             fontSize: 10,
             outline: 'none',
-            minWidth: 32,
+            minWidth: 60,
+            width: Math.max(60, (time.length + 2) * 7) + 'px',
           }}
         />
       </div>

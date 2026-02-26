@@ -19,11 +19,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../../store';
 import type { Plot } from '../../db';
 
-function PlotCard({ plot, index, isSelected, onClick }: {
+function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
   plot: Plot;
   index: number;
   isSelected: boolean;
   onClick: (e: React.MouseEvent) => void;
+  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: plot.id });
 
@@ -56,7 +57,7 @@ function PlotCard({ plot, index, isSelected, onClick }: {
       style={style}
       onClick={onClick}
       className={`
-        rounded-lg border p-3 cursor-pointer transition-colors mb-2
+        rounded-lg border p-3 cursor-pointer transition-colors mb-2 group
         ${isSelected
           ? 'border-indigo-500 bg-indigo-900/20'
           : 'border-gray-700 bg-[#1a1a35] hover:border-gray-600'
@@ -77,9 +78,13 @@ function PlotCard({ plot, index, isSelected, onClick }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-bold text-indigo-400">P{index + 1}</span>
-            <span className="text-sm font-medium text-gray-200 truncate">
+            <span className="text-sm font-medium text-gray-200 truncate flex-1">
               {plot.title || '(제목 없음)'}
             </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); if (confirm('플롯을 삭제하시겠습니까?')) onDelete(); }}
+              className="text-gray-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 flex-shrink-0"
+            >✕</button>
           </div>
           {preview && (
             <p className="text-xs text-gray-500 truncate">{preview}</p>
@@ -93,12 +98,17 @@ function PlotCard({ plot, index, isSelected, onClick }: {
 export default function PlotPanel() {
   const {
     selectedEpisodeId,
+    selectedWorkId,
+    works,
     plots,
     selectedPlotIds,
     selectPlot,
     reorderPlots,
     createPlot,
+    deletePlot,
   } = useStore();
+
+  const currentWork = works.find((w) => w.id === selectedWorkId);
 
   const [newPlotTitle, setNewPlotTitle] = useState('');
   const [showNewPlot, setShowNewPlot] = useState(false);
@@ -123,10 +133,11 @@ export default function PlotPanel() {
   };
 
   const handleCreate = async () => {
-    if (!selectedEpisodeId || !newPlotTitle.trim()) return;
-    await createPlot(selectedEpisodeId, newPlotTitle.trim());
+    const title = newPlotTitle.trim();
+    if (!selectedEpisodeId || !title) return;
     setNewPlotTitle('');
     setShowNewPlot(false);
+    await createPlot(selectedEpisodeId, title);
   };
 
   if (!selectedEpisodeId) {
@@ -144,7 +155,9 @@ export default function PlotPanel() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-        <span className="text-sm font-semibold text-gray-300">플롯 카드</span>
+        <span className="text-sm font-semibold text-gray-300 truncate">
+          {currentWork ? `${currentWork.title} / 플롯 카드` : '플롯 카드'}
+        </span>
         <button
           onClick={() => setShowNewPlot(true)}
           className="text-sm text-indigo-400 hover:text-indigo-300"
@@ -195,6 +208,7 @@ export default function PlotPanel() {
                   index={index}
                   isSelected={selectedPlotIds.includes(plot.id)}
                   onClick={(e) => selectPlot(plot.id, e.metaKey || e.ctrlKey)}
+                  onDelete={() => deletePlot(plot.id)}
                 />
               ))}
             </SortableContext>

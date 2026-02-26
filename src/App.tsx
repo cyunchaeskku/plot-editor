@@ -10,6 +10,7 @@ import ExportButton from './components/Export';
 import { useStore } from './store';
 
 export default function App() {
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const {
     rightPanelMode,
     setRightPanelMode,
@@ -26,12 +27,12 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#f4f5f7] text-gray-800 overflow-hidden">
       {/* Left Sidebar */}
-      <div className="w-56 flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col">
-        <Sidebar />
+      <div className={`${sidebarOpen ? 'w-56' : 'w-8'} flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col transition-all duration-200`}>
+        <Sidebar sidebarOpen={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
       </div>
 
       {/* Middle Panel */}
-      <div className="w-64 flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col">
+      <div className="w-72 flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col">
         <PlotPanel />
       </div>
 

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { SceneHeading, Dialogue, Narration, StageDirection } from './nodes';
+import Underline from '@tiptap/extension-underline';
 import SlashMenu from './SlashMenu';
 import { useStore } from '../../store';
 
@@ -38,20 +39,36 @@ export default function Editor() {
     selectedPlotIds,
     plots,
     selectedEpisodeId,
+    selectedWorkId,
+    characters,
     updatePlot,
     selectPlot,
   } = useStore();
 
   const [activePlotId, setActivePlotId] = useState<number | null>(null);
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({ visible: false, position: { top: 0, left: 0 } });
+  const [showDialogueMenu, setShowDialogueMenu] = useState(false);
+  const dialogueMenuRef = useRef<HTMLDivElement>(null);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(false);
+
+  useEffect(() => {
+    if (!showDialogueMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (dialogueMenuRef.current && !dialogueMenuRef.current.contains(e.target as Node)) {
+        setShowDialogueMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDialogueMenu]);
 
   const episodePlots = selectedEpisodeId ? (plots[selectedEpisodeId] || []) : [];
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false }),
+      Underline,
       SceneHeading,
       Dialogue,
       Narration,
@@ -178,10 +195,38 @@ export default function Editor() {
             onClick={() => editor.chain().focus().setNode('sceneHeading').run()}
             className={`px-2 py-1 text-xs rounded transition-colors ${editor.isActive('sceneHeading') ? 'bg-purple-700 text-purple-200' : 'text-gray-500 hover:bg-gray-700'}`}
           >씬</button>
-          <button
-            onClick={() => editor.chain().focus().setNode('dialogue', { characterName: '', characterColor: '#6366f1' }).run()}
-            className={`px-2 py-1 text-xs rounded transition-colors ${editor.isActive('dialogue') ? 'bg-indigo-700 text-indigo-200' : 'text-gray-500 hover:bg-gray-700'}`}
-          >대사</button>
+          <div className="relative" ref={dialogueMenuRef}>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault(); // 에디터 selection 유지
+                const chars = selectedWorkId ? (characters[selectedWorkId] || []) : [];
+                if (chars.length === 0) {
+                  editor.chain().focus().setNode('dialogue', { characterName: '', characterColor: '#6366f1' }).run();
+                } else {
+                  setShowDialogueMenu((v) => !v);
+                }
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${editor.isActive('dialogue') ? 'bg-indigo-700 text-indigo-200' : 'text-gray-500 hover:bg-gray-700'}`}
+            >대사</button>
+            {showDialogueMenu && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-gray-800 border border-gray-600 rounded shadow-lg min-w-[120px]">
+                {(selectedWorkId ? (characters[selectedWorkId] || []) : []).map((char) => (
+                  <button
+                    key={char.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // 에디터 포커스 유지
+                      editor.chain().focus().setNode('dialogue', { characterName: char.name, characterColor: char.color }).run();
+                      setShowDialogueMenu(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-700 text-left"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: char.color }} />
+                    {char.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => editor.chain().focus().setNode('narration').run()}
             className={`px-2 py-1 text-xs rounded transition-colors ${editor.isActive('narration') ? 'bg-gray-600 text-gray-200' : 'text-gray-500 hover:bg-gray-700'}`}
@@ -195,7 +240,30 @@ export default function Editor() {
             className={`px-2 py-1 text-xs rounded transition-colors ${editor.isActive('paragraph') ? 'bg-gray-600 text-gray-200' : 'text-gray-500 hover:bg-gray-700'}`}
           >단락</button>
           <div className="flex-1" />
-          <span className="text-xs text-gray-700">/ 로 서식 선택</span>
+          {/* Text formatting */}
+          <div className="flex items-center gap-0.5 border-l border-gray-700 pl-2 ml-1">
+            <button
+              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
+              className={`px-2 py-1 text-xs rounded font-bold transition-colors ${editor.isActive('bold') ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-700'}`}
+              title="굵게 (Cmd+B)"
+            >B</button>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
+              className={`px-2 py-1 text-xs rounded italic transition-colors ${editor.isActive('italic') ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-700'}`}
+              title="기울임 (Cmd+I)"
+            >I</button>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
+              className={`px-2 py-1 text-xs rounded underline transition-colors ${editor.isActive('underline') ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-700'}`}
+              title="밑줄 (Cmd+U)"
+            >U</button>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }}
+              className={`px-2 py-1 text-xs rounded line-through transition-colors ${editor.isActive('strike') ? 'bg-gray-600 text-white' : 'text-gray-500 hover:bg-gray-700'}`}
+              title="취소선"
+            >S</button>
+          </div>
+          <span className="text-xs text-gray-700 ml-2">/ 로 서식 선택</span>
         </div>
       )}
 
