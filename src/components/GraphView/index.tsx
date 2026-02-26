@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
+import { toPng } from 'html-to-image';
 import ReactFlow, {
   Background,
   Controls,
@@ -146,7 +147,23 @@ const nodeTypes = { characterNode: CharacterNode };
 const edgeTypes = { floating: FloatingEdge };
 
 export default function GraphView() {
-  const { selectedWorkId, characters, relations, selectCharacter } = useStore();
+  const { selectedWorkId, characters, relations, selectCharacter, works } = useStore();
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPng = useCallback(async () => {
+    const el = graphContainerRef.current?.querySelector('.react-flow') as HTMLElement | null;
+    if (!el) return;
+    const workName = works.find((w) => w.id === selectedWorkId)?.title ?? '관계도';
+    try {
+      const dataUrl = await toPng(el, { backgroundColor: '#f4f5f7', pixelRatio: 2 });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${workName}_관계도.png`;
+      a.click();
+    } catch (e) {
+      console.error('PNG export failed:', e);
+    }
+  }, [selectedWorkId, works]);
   const workChars = selectedWorkId ? (characters[selectedWorkId] || []) : [];
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -260,7 +277,15 @@ export default function GraphView() {
   }
 
   return (
-    <div className="w-full h-full">
+    <div ref={graphContainerRef} className="w-full h-full relative">
+      {/* Export PNG button */}
+      <button
+        onClick={handleExportPng}
+        className="absolute top-3 right-3 z-10 px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-600 rounded shadow hover:bg-gray-50 transition-colors"
+        title="관계도를 PNG로 내보내기"
+      >
+        🖼️ PNG 내보내기
+      </button>
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -112,15 +112,11 @@ export default function Editor() {
     },
   });
 
-  // Load plot content when activePlotId changes
-  useEffect(() => {
-    if (!editor || !activePlotId) return;
-    const plot = episodePlots.find((p) => p.id === activePlotId);
-    if (!plot) return;
-
+  const loadPlotContent = useCallback((plotContent: string) => {
+    if (!editor) return;
     isLoadingRef.current = true;
     try {
-      const content = JSON.parse(plot.content);
+      const content = JSON.parse(plotContent);
       if (content && Object.keys(content).length > 0) {
         editor.commands.setContent(content);
       } else {
@@ -130,7 +126,33 @@ export default function Editor() {
       editor.commands.setContent('<p></p>');
     }
     setTimeout(() => { isLoadingRef.current = false; }, 50);
+  }, [editor]);
+
+  // Load plot content when activePlotId changes
+  useEffect(() => {
+    if (!editor || !activePlotId) return;
+    const plot = episodePlots.find((p) => p.id === activePlotId);
+    if (!plot) return;
+    loadPlotContent(plot.content);
   }, [activePlotId]);
+
+  // Reload if store content changes externally (e.g. character color sync)
+  const activePlotContent = activePlotId
+    ? episodePlots.find((p) => p.id === activePlotId)?.content
+    : undefined;
+  const prevContentRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!editor || !activePlotId || isLoadingRef.current) return;
+    if (activePlotContent === undefined) return;
+    if (prevContentRef.current === undefined) {
+      prevContentRef.current = activePlotContent;
+      return;
+    }
+    if (activePlotContent !== prevContentRef.current) {
+      prevContentRef.current = activePlotContent;
+      loadPlotContent(activePlotContent);
+    }
+  }, [activePlotContent]);
 
   // Set active plot to first selected when selection changes
   useEffect(() => {

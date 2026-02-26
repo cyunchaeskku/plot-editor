@@ -190,9 +190,42 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   updateCharacter: async (id, name, color, properties, memo = '', image = '') => {
+    const { selectedWorkId, characters, episodes, plots } = get();
+    // Capture old character name before update for dialogue sync
+    const workChars = selectedWorkId ? (characters[selectedWorkId] || []) : [];
+    const oldChar = workChars.find((c) => c.id === id);
+    const oldName = oldChar?.name ?? '';
+
     await db.updateCharacter(id, name, color, properties, memo, image);
-    const { selectedWorkId } = get();
     if (selectedWorkId) await get().loadCharacters(selectedWorkId);
+
+    // Sync characterName/characterColor in all dialogue nodes across this work's plots
+    if (selectedWorkId && (oldName || name)) {
+      const workEpisodes = episodes[selectedWorkId] || [];
+      for (const ep of workEpisodes) {
+        const epPlots = plots[ep.id] || [];
+        for (const plot of epPlots) {
+          try {
+            const content = JSON.parse(plot.content);
+            if (!content.content) continue;
+            let changed = false;
+            const syncNodes = (nodes: any[]): any[] => nodes.map((node: any) => {
+              if (node.type === 'dialogue' && node.attrs?.characterName === oldName) {
+                changed = true;
+                return { ...node, attrs: { ...node.attrs, characterName: name, characterColor: color } };
+              }
+              if (node.content) return { ...node, content: syncNodes(node.content) };
+              return node;
+            });
+            const newContent = { ...content, content: syncNodes(content.content) };
+            if (changed) {
+              await db.updatePlot(plot.id, plot.title, JSON.stringify(newContent));
+              await get().loadPlots(ep.id);
+            }
+          } catch {}
+        }
+      }
+    }
   },
 
   deleteCharacter: async (id) => {

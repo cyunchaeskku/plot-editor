@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import sidebarCollapseIcon from '../../assets/sidebar_collapse_icon.svg';
 import { useStore } from '../../store';
 
 const PRESET_COLORS = [
@@ -99,9 +100,12 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
         <button
           onClick={onToggle}
-          className="text-gray-500 hover:text-gray-300 text-xs w-4 text-center flex-shrink-0"
+          className="text-gray-500 hover:text-gray-300 flex-shrink-0 flex items-center justify-center"
           title={sidebarOpen ? '접기' : '펼치기'}
-        >{sidebarOpen ? '◀' : '▶'}</button>
+          style={{ transform: sidebarOpen ? 'none' : 'scaleX(-1)' }}
+        >
+          <img src={sidebarCollapseIcon} alt="사이드바 접기" style={{ width: 16, height: 16, filter: 'invert(0.6)' }} />
+        </button>
         {sidebarOpen && (
           <>
             <span className="font-semibold text-gray-300 flex-1 ml-2">작품 목록</span>

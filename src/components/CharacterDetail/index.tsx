@@ -102,9 +102,11 @@ export default function CharacterDetail() {
 
   const handleAddRelation = async () => {
     if (!newRelTarget || !newRelName.trim()) return;
-    await createRelation(char.id, newRelTarget as number, newRelName.trim());
+    const target = newRelTarget as number;
+    const name = newRelName.trim();
     setNewRelTarget('');
     setNewRelName('');
+    await createRelation(char.id, target, name);
   };
 
   return (
