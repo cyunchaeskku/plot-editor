@@ -21,6 +21,7 @@ function extractText(node: any): string {
 
 async function exportDocx(plotGroups: { title: string; plots: Plot[] }[]) {
   const children: Paragraph[] = [];
+  let sceneCount = 0;
 
   let maxNameLen = 0;
   for (const group of plotGroups) {
@@ -66,11 +67,13 @@ async function exportDocx(plotGroups: { title: string; plots: Plot[] }[]) {
           const paras: Paragraph[] = [];
           switch (node.type) {
             case 'sceneHeading': {
+              sceneCount += 1;
+              const headingText = `S#${sceneCount} ${extractText(node)}`;
               const location = (node.attrs?.location as string) || '';
               const time = (node.attrs?.time as string) || '';
               const locationTime = [location, time].filter(Boolean).join(' · ');
               const sceneChildren: TextRun[] = [
-                new TextRun({ text: extractText(node), bold: true, allCaps: true, color: 'a78bfa' }),
+                new TextRun({ text: headingText, bold: true, allCaps: true, color: 'a78bfa' }),
               ];
               if (locationTime) {
                 sceneChildren.push(

@@ -23,6 +23,15 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     toggleWorkExpand, toggleEpisodeExpand,
   } = useStore();
 
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/me', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data?.email) setUserEmail(data.email); })
+      .catch(() => {});
+  }, []);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [newWorkInput, setNewWorkInput] = useState(false);
@@ -441,6 +450,25 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
           </div>
         )}
       </div>
+
+      {/* Login / user info */}
+      {sidebarOpen && (
+        <div className="border-t border-[#2a1208] p-3">
+          {userEmail ? (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+              <span className="text-xs text-[#c0a090] truncate" title={userEmail}>{userEmail}</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => { window.location.href = "http://localhost:8000/login"; }}
+              className="w-full text-sm text-[#c0a090] hover:text-[#E88D14] py-1 text-left"
+            >
+              로그인
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

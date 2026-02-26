@@ -219,14 +219,37 @@ export default function GraphView() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [bouncingNodeId, setBouncingNodeId] = useState<string | null>(null);
   const nodePositions = useRef<Record<string, { x: number; y: number }>>({});
+  const layoutSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // GraphView 진입 시 저장된 노드 위치 불러오기
+  useEffect(() => {
+    if (!selectedWorkId) return;
+    fetch(`http://localhost:8000/graph-layout/${selectedWorkId}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((positions: Record<string, { x: number; y: number }>) => {
+        nodePositions.current = positions;
+      })
+      .catch(() => {});
+  }, [selectedWorkId]);
 
   const handleNodesChange = useCallback((changes: Parameters<typeof onNodesChange>[0]) => {
     onNodesChange(changes);
     setNodes((nds) => {
       nds.forEach((n) => { nodePositions.current[n.id] = n.position; });
+      // 1초 debounce 후 클라우드 저장
+      if (layoutSaveTimeout.current) clearTimeout(layoutSaveTimeout.current);
+      layoutSaveTimeout.current = setTimeout(() => {
+        if (!selectedWorkId) return;
+        fetch(`http://localhost:8000/graph-layout/${selectedWorkId}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nodePositions.current),
+        }).catch(() => {});
+      }, 1000);
       return nds;
     });
-  }, [onNodesChange, setNodes]);
+  }, [onNodesChange, setNodes, selectedWorkId]);
 
   useEffect(() => {
     const count = workChars.length;
