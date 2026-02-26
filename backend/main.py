@@ -447,7 +447,7 @@ async def logout(request: Request) -> RedirectResponse:
 
     cognito_domain = os.getenv("COGNITO_DOMAIN")
     client_id = os.getenv("COGNITO_CLIENT_ID")
-    logout_uri = os.getenv("LOGOUT_URI", "/")
+    logout_uri = os.getenv("LOGOUT_URI", os.getenv("FRONTEND_URL", "/"))
 
     if cognito_domain and client_id:
         # Redirect to Cognito hosted logout so the Cognito session is also cleared.

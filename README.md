@@ -205,8 +205,8 @@ COGNITO_CLIENT_SECRET=<앱 클라이언트 시크릿>
 COGNITO_DOMAIN=https://<your-domain>.auth.ap-northeast-2.amazoncognito.com
 
 REDIRECT_URI=http://localhost:8000/authorize
-LOGOUT_URI=http://localhost:1420
-FRONTEND_URL=http://localhost:1420
+LOGOUT_URI=https://plot-editor.vercel.app/
+FRONTEND_URL=https://plot-editor.vercel.app/
 
 # AWS 자격증명
 AWS_ACCESS_KEY_ID=<IAM 액세스 키>
