@@ -77,10 +77,7 @@ export default function PlanningDoc() {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current || !selectedWorkId) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        savePlanningDoc(selectedWorkId, JSON.stringify(editor.getJSON()));
-      }, 500);
+      savePlanningDoc(selectedWorkId, JSON.stringify(editor.getJSON()));
     },
   });
 

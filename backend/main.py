@@ -1,5 +1,7 @@
+import logging
 import os
 import sys
+import traceback
 
 # Lambda 환경에서 Linux 호환 패키지를 사용 (pip --platform으로 빌드된 manylinux 바이너리)
 _lambda_pkg = os.path.join(os.path.dirname(__file__), "lambda_package")
@@ -19,6 +21,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,6 +51,22 @@ def _require_login(request: Request) -> str:
 
 app = FastAPI(title="Plot Editor Auth")
 
+
+from fastapi import Request as _Request
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: _Request, exc: Exception):
+    logger.error(
+        "Unhandled exception: %s %s\n%s",
+        request.method,
+        request.url.path,
+        traceback.format_exc(),
+    )
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 _allowed_origins = [o.strip() for o in os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:1420,http://localhost:5173,https://plot-editor.vercel.app",
@@ -61,6 +82,8 @@ app.add_middleware(
 app.add_middleware(
     SessionMiddleware,
     secret_key=_require_env("SECRET_KEY"),
+    same_site="none",
+    https_only=True,
 )
 
 # ---------------------------------------------------------------------------
@@ -87,12 +110,7 @@ oauth.register(
 # DynamoDB
 # ---------------------------------------------------------------------------
 
-_dynamodb = boto3.resource(
-    "dynamodb",
-    region_name=_region,
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-)
+_dynamodb = boto3.resource("dynamodb", region_name=_region)
 _users_table      = _dynamodb.Table("users")
 _works_table      = _dynamodb.Table("works")
 _episodes_table   = _dynamodb.Table("episodes")
@@ -101,12 +119,7 @@ _characters_table = _dynamodb.Table("characters")
 _relations_table  = _dynamodb.Table("character_relations")
 _graph_table      = _dynamodb.Table("graph_layouts")
 
-_s3 = boto3.client(
-    "s3",
-    region_name=_region,
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-)
+_s3 = boto3.client("s3", region_name=_region)
 _S3_BUCKET = os.getenv("S3_BUCKET", "")
 
 # ---------------------------------------------------------------------------
@@ -185,12 +198,13 @@ async def create_work(request: Request):
     body = await request.json()
     work_id = body["work_id"]
     _works_table.put_item(Item={
-        "work_id":    f"{sub}#{work_id}",
-        "user_sub":   sub,
-        "local_id":   work_id,
-        "title":      body.get("title", ""),
-        "type":       body.get("type", "plot"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "work_id":      f"{sub}#{work_id}",
+        "user_sub":     sub,
+        "local_id":     work_id,
+        "title":        body.get("title", ""),
+        "type":         body.get("type", "plot"),
+        "planning_doc": body.get("planning_doc", ""),
+        "created_at":   datetime.now(timezone.utc).isoformat(),
     })
     return {"ok": True}
 
@@ -201,9 +215,13 @@ async def update_work(work_id: int, request: Request):
     body = await request.json()
     _works_table.update_item(
         Key={"work_id": f"{sub}#{work_id}"},
-        UpdateExpression="SET title = :t, #tp = :tp",
+        UpdateExpression="SET title = :t, #tp = :tp, planning_doc = :pd",
         ExpressionAttributeNames={"#tp": "type"},
-        ExpressionAttributeValues={":t": body.get("title", ""), ":tp": body.get("type", "plot")},
+        ExpressionAttributeValues={
+            ":t": body.get("title", ""),
+            ":tp": body.get("type", "plot"),
+            ":pd": body.get("planning_doc", ""),
+        },
     )
     return {"ok": True}
 
@@ -312,7 +330,7 @@ async def delete_plot(plot_id: int, request: Request):
     try:
         _s3.delete_object(Bucket=_S3_BUCKET, Key=s3_key)
     except Exception:
-        pass
+        logger.warning("S3 delete failed for key %s:\n%s", s3_key, traceback.format_exc())
     _plots_table.delete_item(Key={"plot_id": f"{sub}#{plot_id}"})
     return {"ok": True}
 
@@ -339,8 +357,11 @@ async def get_plot_content(plot_id: int, request: Request):
     try:
         obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
         return Response(content=obj["Body"].read(), media_type="application/json")
-    except _s3.exceptions.NoSuchKey:
-        return Response(content=b"{}", media_type="application/json")
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            return Response(content=b"{}", media_type="application/json")
+        logger.error("S3 get failed for key %s:\n%s", s3_key, traceback.format_exc())
+        raise
 
 
 # ── Characters ─────────────────────────────────────────────────────────────

@@ -17,7 +17,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useStore } from '../../store';
-import { updateEpisodeOrder } from '../../db';
 import type { Episode } from '../../db';
 
 function ChapterItem({ episode, index, isActive, onClick, onDelete, onRename }: {
@@ -113,7 +112,7 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter, v
     createEpisode,
     updateEpisode,
     deleteEpisode,
-    loadEpisodes,
+    reorderEpisodes,
   } = useStore();
 
   const [newTitle, setNewTitle] = useState('');
@@ -127,17 +126,16 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter, v
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !selectedWorkId) return;
     const oldIndex = chapterList.findIndex((ep) => ep.id === active.id);
     const newIndex = chapterList.findIndex((ep) => ep.id === over.id);
-    const reordered = arrayMove(chapterList, oldIndex, newIndex);
-    // Update order_index for each episode
-    for (let i = 0; i < reordered.length; i++) {
-      await updateEpisodeOrder(reordered[i].id, i);
-    }
-    await loadEpisodes(selectedWorkId);
+    const reordered = arrayMove(chapterList, oldIndex, newIndex).map((ep, i) => ({
+      ...ep,
+      order_index: i,
+    }));
+    reorderEpisodes(selectedWorkId, reordered);
   };
 
   const handleCreate = async () => {

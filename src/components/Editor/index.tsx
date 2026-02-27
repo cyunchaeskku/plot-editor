@@ -41,7 +41,7 @@ export default function Editor() {
     selectedEpisodeId,
     selectedWorkId,
     characters,
-    updatePlot,
+    setPlotContent,
     selectPlot,
   } = useStore();
 
@@ -51,7 +51,6 @@ export default function Editor() {
   const [lineNumbers, setLineNumbers] = useState<{ top: number; line: number }[]>([]);
   const dialogueMenuRef = useRef<HTMLDivElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(false);
   const isRenumberingRef = useRef(false);
 
@@ -149,23 +148,10 @@ export default function Editor() {
         setSlashMenu((s) => ({ ...s, visible: false }));
       }
 
-      // Auto-save with debounce
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      saveTimeout.current = setTimeout(() => {
-        const content = JSON.stringify(editor.getJSON());
-        const activePlot = episodePlots.find((p) => p.id === activePlotId);
-        if (activePlot) {
-          prevContentRef.current = content; // 자신의 저장임을 표시 → 스토어 반환값과 일치하면 reload 스킵
-          updatePlot(activePlotId, activePlot.title, content); // 로컬 SQLite
-          // 클라우드 동기화 (fire-and-forget, 오류 무시)
-          fetch(`${import.meta.env.VITE_API_BASE_URL}/plots/${activePlotId}/content`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: content,
-          }).catch(() => {});
-        }
-      }, 500);
+      // Update store content immediately (no debounce — Save button persists)
+      const content = JSON.stringify(editor.getJSON());
+      prevContentRef.current = content;
+      setPlotContent(activePlotId, content);
     },
   });
 

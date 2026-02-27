@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import sidebarCollapseIcon from '../../assets/sidebar_collapse_icon.svg';
 import { useStore } from '../../store';
 import type { WorkType } from '../../db';
@@ -13,7 +13,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     works, episodes, plots, characters,
     selectedWorkId, selectedEpisodeId, selectedPlotIds,
     expandedWorkIds, expandedEpisodeIds,
-    loadWorks,
+    isLoggedIn, userEmail,
     createWork, updateWork, updateWorkType, deleteWork,
     createEpisode, updateEpisode, deleteEpisode,
     createPlot, deletePlot,
@@ -22,15 +22,6 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     selectCharacter, selectedCharacterId,
     toggleWorkExpand, toggleEpisodeExpand,
   } = useStore();
-
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/me`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.email) setUserEmail(data.email); })
-      .catch(() => {});
-  }, []);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
@@ -53,9 +44,6 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     return pool[Math.floor(Math.random() * pool.length)];
   };
 
-  useEffect(() => {
-    loadWorks();
-  }, []);
 
   const startEdit = (key: string, value: string) => {
     setEditingId(key);

@@ -19,8 +19,7 @@ interface NovelEditorProps {
 }
 
 export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
-  const { plots, selectedEpisodeId, updatePlot, selectedWorkId, works, episodes } = useStore();
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { plots, selectedEpisodeId, setPlotContent, selectedWorkId, works, episodes } = useStore();
   const isLoadingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,14 +54,8 @@ export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current || !chapterPlotId) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const content = JSON.stringify(editor.getJSON());
-        const plot = episodePlots.find((p) => p.id === chapterPlotId);
-        if (plot) {
-          updatePlot(chapterPlotId, plot.title, content);
-        }
-      }, 500);
+      const content = JSON.stringify(editor.getJSON());
+      setPlotContent(chapterPlotId, content);
     },
   });
 

@@ -26,8 +26,7 @@ export default function ChapterEditorSection({
   onActivate,
   onTransaction,
 }: ChapterEditorSectionProps) {
-  const { plots, updatePlot } = useStore();
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { plots, setPlotContent } = useStore();
   const isLoadingRef = useRef(false);
 
   const plot = (plots[episode.id] || []).find((p) => p.id === plotId);
@@ -59,14 +58,8 @@ export default function ChapterEditorSection({
     },
     onUpdate: ({ editor }) => {
       if (isLoadingRef.current || !plotId) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const content = JSON.stringify(editor.getJSON());
-        const currentPlot = useStore.getState().plots[episode.id]?.find((p) => p.id === plotId);
-        if (currentPlot) {
-          updatePlot(plotId, currentPlot.title, content);
-        }
-      }, 500);
+      const content = JSON.stringify(editor.getJSON());
+      setPlotContent(plotId, content);
     },
   });
 

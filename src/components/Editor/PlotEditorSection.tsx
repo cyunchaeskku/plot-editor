@@ -29,8 +29,7 @@ export default function PlotEditorSection({
   onActivate,
   onTransaction,
 }: PlotEditorSectionProps) {
-  const { updatePlot } = useStore();
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { setPlotContent } = useStore();
   const isLoadingRef = useRef(false);
   const isRenumberingRef = useRef(false);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -117,16 +116,9 @@ export default function PlotEditorSection({
         setSlashMenu((s) => ({ ...s, visible: false }));
       }
 
-      // Auto-save 500ms debounce
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        const content = JSON.stringify(editor.getJSON());
-        // Read latest plot title from store
-        const latestPlot = useStore.getState().plots[episodeId]?.find((p) => p.id === plot.id);
-        if (latestPlot) {
-          updatePlot(plot.id, latestPlot.title, content);
-        }
-      }, 500);
+      // Update store content immediately (no debounce — Save button persists)
+      const content = JSON.stringify(editor.getJSON());
+      setPlotContent(plot.id, content);
     },
   });
 

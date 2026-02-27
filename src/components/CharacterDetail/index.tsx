@@ -214,7 +214,10 @@ export default function CharacterDetail() {
 
         {/* Image */}
         <div>
-          <label className="text-xs text-gray-500 mb-2 block">사진</label>
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-xs text-gray-500">사진</label>
+            <span className="text-[10px] text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">이미지 동기화 준비 중</span>
+          </div>
           {image ? (
             <div className="flex items-center gap-3">
               <img

@@ -27,7 +27,45 @@ export default function App() {
     selectEpisode,
     createPlot,
     loadPlots,
+    loadWorks,
+    loadUserInfo,
+    isDirty,
+    isSaving,
+    isLoggedIn,
+    saveAll,
   } = useStore();
+
+  // On mount: load user info and works from API
+  useEffect(() => {
+    loadUserInfo();
+    loadWorks();
+  }, []);
+
+  // beforeunload guard
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Cmd+S / Ctrl+S shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (isDirty && !isSaving && selectedWorkId) {
+          saveAll(selectedWorkId).catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isDirty, isSaving, selectedWorkId]);
 
   const selectedWork = selectedWorkId ? works.find((w) => w.id === selectedWorkId) : null;
   const workType = selectedWork?.type ?? 'plot';
@@ -104,6 +142,18 @@ export default function App() {
     setScrollTargetEpisodeId(episodeId);
   }, []);
 
+  // ── Save button label ─────────────────────────────────────────────────────
+
+  const handleSave = () => {
+    if (!selectedWorkId || !isDirty || isSaving) return;
+    saveAll(selectedWorkId).catch(() => {});
+  };
+
+  const saveButtonLabel = isSaving ? '저장 중...' : isDirty ? '저장 •' : '저장됨 ✓';
+  const saveButtonClass = isSaving || !isDirty
+    ? 'px-3 py-1 text-xs rounded text-gray-400 bg-gray-100 cursor-default'
+    : 'px-3 py-1 text-xs rounded bg-[#AD1B02] text-white hover:bg-[#8a1500] transition-colors';
+
   return (
     <div className="flex h-screen bg-[#faf8f5] text-gray-800 overflow-hidden">
       {/* Left Sidebar */}
@@ -166,6 +216,17 @@ export default function App() {
             📝 기획서
           </button>
           <div className="flex-1" />
+          {/* Save button — only shown when logged in and a work is selected */}
+          {selectedWorkId && isLoggedIn && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              className={saveButtonClass}
+              title={isDirty ? 'Cmd+S' : ''}
+            >
+              {saveButtonLabel}
+            </button>
+          )}
           {workType === 'plot' && currentEpisode && (
             <ExportButton episodeTitle={currentEpisode.title} />
           )}
