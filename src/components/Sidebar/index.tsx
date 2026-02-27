@@ -13,7 +13,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     works, episodes, plots, characters,
     selectedWorkId, selectedEpisodeId, selectedPlotIds,
     expandedWorkIds, expandedEpisodeIds,
-    isLoggedIn, userEmail,
+    isLoggedIn, userEmail, isDirty,
     createWork, updateWork, updateWorkType, deleteWork,
     createEpisode, updateEpisode, deleteEpisode,
     createPlot, deletePlot,
@@ -442,10 +442,20 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
       {/* Login / user info */}
       {sidebarOpen && (
         <div className="border-t border-[#2a1208] p-3">
-          {userEmail ? (
+          {isLoggedIn && userEmail ? (
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-              <span className="text-xs text-[#c0a090] truncate" title={userEmail}>{userEmail}</span>
+              <span className="text-xs text-[#c0a090] truncate flex-1" title={userEmail}>{userEmail}</span>
+              <button
+                onClick={() => {
+                  if (isDirty && !window.confirm('저장되지 않은 변경사항이 있습니다. 로그아웃하면 사라집니다. 계속하시겠습니까?')) return;
+                  window.location.href = `${import.meta.env.VITE_API_BASE_URL}/logout`;
+                }}
+                className="text-xs text-gray-600 hover:text-red-400 flex-shrink-0 transition-colors"
+                title="로그아웃"
+              >
+                로그아웃
+              </button>
             </div>
           ) : (
             <button
