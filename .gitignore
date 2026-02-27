@@ -27,4 +27,11 @@ src-tauri/target/
 *.sw?
 
 # sensitive data
-.envbackend/lambda_package/
+.env
+backend/lambda_package/
+
+# Video files
+*.mp4
+*.mov
+*.avi
+*.mkv
