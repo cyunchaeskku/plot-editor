@@ -1,0 +1,60 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: cyunchae
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: plot-editor
+service: plot-editor-backend
+
+provider:
+  name: aws
+  runtime: python3.13 # 로컬 파이썬 버전에 맞게 수정하세요 (예: python3.10)
+  region: ap-northeast-2
+  stage: dev
+  environment:
+    # .env 파일에서 환경변수를 자동으로 불러옵니다 (serverless-dotenv-plugin)
+    SECRET_KEY: ${env:SECRET_KEY}
+    COGNITO_REGION: ${env:COGNITO_REGION}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
+    COGNITO_CLIENT_ID: ${env:COGNITO_CLIENT_ID}
+    COGNITO_CLIENT_SECRET: ${env:COGNITO_CLIENT_SECRET}
+    COGNITO_DOMAIN: ${env:COGNITO_DOMAIN}
+    REDIRECT_URI: ${env:REDIRECT_URI}
+    LOGOUT_URI: ${env:LOGOUT_URI}
+    FRONTEND_URL: ${env:FRONTEND_URL}
+    S3_BUCKET: ${env:S3_BUCKET}
+    # AWS 인증 정보는 이미 IAM Role에 의해 부여되므로 코드 내 boto3에서 자동으로 사용합니다.
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+            - dynamodb:Query
+          Resource: "arn:aws:dynamodb:${aws:region}:*:table/*"
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource: "arn:aws:s3:::${env:S3_BUCKET}/*"
+
+functions:
+  api:
+    handler: main.handler # main.py 의 handler 변수를 가리킴
+    events:
+      - httpApi: '*' # 모든 경로를 FastAPI로 넘김
+
+plugins:
+  - serverless-dotenv-plugin
+
+custom:
+  dotenv:
+    exclude:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+  pythonRequirements:
+    dockerizePip: false # Mac 환경에서 간단한 패키지만 배포하므로 일단 false (에러 시 true로 변경 필요할 수 있음)

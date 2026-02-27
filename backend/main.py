@@ -467,8 +467,11 @@ async def logout(request: Request) -> RedirectResponse:
 
 
 # ---------------------------------------------------------------------------
-# Dev entry-point
+# Dev entry-point & AWS Lambda Handler
 # ---------------------------------------------------------------------------
+
+from mangum import Mangum
+handler = Mangum(app)
 
 if __name__ == "__main__":
     import uvicorn
