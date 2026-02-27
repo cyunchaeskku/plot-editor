@@ -1,4 +1,11 @@
 import os
+import sys
+
+# Lambda 환경에서 Linux 호환 패키지를 사용 (pip --platform으로 빌드된 manylinux 바이너리)
+_lambda_pkg = os.path.join(os.path.dirname(__file__), "lambda_package")
+if os.path.isdir(_lambda_pkg) and _lambda_pkg not in sys.path:
+    sys.path.insert(0, _lambda_pkg)
+
 from datetime import datetime, timezone
 from urllib.parse import quote
 

@@ -59,8 +59,8 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
       className={`
         rounded-lg border p-3 cursor-pointer transition-colors mb-2 group
         ${isSelected
-          ? 'border-[#AD1B02] bg-[#AD1B02]/10'
-          : 'border-[#2a1208] bg-[#1c0e08] hover:border-[#3a1a0a]'
+          ? 'border-[#AD1B02] bg-[#3d0c04] border-l-[3px]'
+          : 'border-[#2a1208] bg-[#1c0e08] hover:border-[#3a1a0a] border-l-[3px] border-l-transparent'
         }
       `}
     >
@@ -69,7 +69,7 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
         <span
           {...attributes}
           {...listeners}
-          className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing mt-0.5 text-xs select-none"
+          className="text-[#5a3020] hover:text-[#a07050] cursor-grab active:cursor-grabbing mt-0.5 text-xs select-none"
           onClick={(e) => e.stopPropagation()}
         >
           ⠿
@@ -95,7 +95,13 @@ function PlotCard({ plot, index, isSelected, onClick, onDelete }: {
   );
 }
 
-export default function PlotPanel() {
+interface PlotPanelProps {
+  viewMode: 'single' | 'continuous';
+  onViewModeChange: (mode: 'single' | 'continuous') => void;
+  onScrollTo?: (plotId: number) => void;
+}
+
+export default function PlotPanel({ viewMode, onViewModeChange, onScrollTo }: PlotPanelProps) {
   const {
     selectedEpisodeId,
     selectedWorkId,
@@ -142,7 +148,7 @@ export default function PlotPanel() {
 
   if (!selectedEpisodeId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-[#6a4030] text-sm">
+      <div className="flex-1 flex items-center justify-center text-[#8a5535] text-sm">
         <div className="text-center">
           <div className="text-4xl mb-3">📋</div>
           <p>좌측에서 에피소드를 선택하세요</p>
@@ -158,10 +164,25 @@ export default function PlotPanel() {
         <span className="text-sm font-semibold text-[#e8d0c0] truncate">
           {currentWork ? `${currentWork.title} / 플롯 카드` : '플롯 카드'}
         </span>
-        <button
-          onClick={() => setShowNewPlot(true)}
-          className="text-sm text-[#E88D14] hover:text-[#F3BE26]"
-        >+ 플롯 추가</button>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded overflow-hidden border border-[#3a1a0a]">
+            <button
+              onClick={() => onViewModeChange('single')}
+              className={`px-2 py-0.5 text-xs transition-colors ${viewMode === 'single' ? 'bg-[#AD1B02] text-[#f0ddd0]' : 'text-[#8a5535] hover:text-[#e8d0c0]'}`}
+              title="단일 플롯 뷰"
+            >단일</button>
+            <button
+              onClick={() => onViewModeChange('continuous')}
+              className={`px-2 py-0.5 text-xs transition-colors ${viewMode === 'continuous' ? 'bg-[#AD1B02] text-[#f0ddd0]' : 'text-[#8a5535] hover:text-[#e8d0c0]'}`}
+              title="연속 플롯 뷰"
+            >연속</button>
+          </div>
+          <button
+            onClick={() => setShowNewPlot(true)}
+            className="text-sm text-[#E88D14] hover:text-[#F3BE26]"
+          >+ 추가</button>
+        </div>
       </div>
 
       {/* New plot input */}
@@ -186,7 +207,7 @@ export default function PlotPanel() {
       {/* Plot list */}
       <div className="flex-1 overflow-y-auto p-4">
         {episodePlots.length === 0 ? (
-          <div className="text-center text-[#6a4030] text-sm mt-8">
+          <div className="text-center text-[#8a5535] text-sm mt-8">
             <div className="text-3xl mb-2">📝</div>
             <p>플롯이 없습니다</p>
             <button
@@ -206,8 +227,14 @@ export default function PlotPanel() {
                   key={plot.id}
                   plot={plot}
                   index={index}
-                  isSelected={selectedPlotIds.includes(plot.id)}
-                  onClick={(e) => selectPlot(plot.id, e.metaKey || e.ctrlKey)}
+                  isSelected={viewMode === 'single' && selectedPlotIds.includes(plot.id)}
+                  onClick={(e) => {
+                    if (viewMode === 'continuous' && onScrollTo) {
+                      onScrollTo(plot.id);
+                    } else {
+                      selectPlot(plot.id, e.metaKey || e.ctrlKey);
+                    }
+                  }}
                   onDelete={() => deletePlot(plot.id)}
                 />
               ))}

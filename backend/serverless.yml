@@ -42,6 +42,15 @@ provider:
             - s3:DeleteObject
           Resource: "arn:aws:s3:::${env:S3_BUCKET}/*"
 
+package:
+  patterns:
+    - "!.venv/**"
+    - "!node_modules/**"
+    - "!.serverless/**"
+    - "!__pycache__/**"
+    - "!*.pyc"
+    - "lambda_package/**"
+
 functions:
   api:
     handler: main.handler # main.py 의 handler 변수를 가리킴
@@ -56,5 +65,3 @@ custom:
     exclude:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
-  pythonRequirements:
-    dockerizePip: false # Mac 환경에서 간단한 패키지만 배포하므로 일단 false (에러 시 true로 변경 필요할 수 있음)

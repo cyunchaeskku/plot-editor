@@ -27,8 +27,9 @@ Tauri를 통해 네이티브 데스크탑 바이너리로도 패키징할 수 �
 
 ## 클라우드 동기화 (선택 사항)
 
-`backend/` 디렉터리에 **FastAPI 백엔드**가 포함되어 있습니다. 로컬 SQLite와 병행하여 AWS DynamoDB + S3에 데이터를 미러링합니다.
+`backend/` 디렉터리에 **FastAPI 백엔드**가 포함되어 있으며, 현재 **AWS Lambda (Serverless)**로 배포되어 있습니다. 로컬 SQLite와 병행하여 AWS DynamoDB + S3에 데이터를 미러링합니다.
 
+- **백엔드 API 주소**: `https://2d7yy4qlcb.execute-api.ap-northeast-2.amazonaws.com`
 - **인증**: AWS Cognito OIDC (Google 로그인 등 외부 IdP 연동 가능)
 - **메타데이터**: DynamoDB 6개 테이블 (works / episodes / plots / characters / character_relations / graph_layouts)
 - **대본 본문**: S3 버킷 (`plot-editor-contents`) — TipTap JSON을 `plots/{sub}/{plot_id}.json` 키로 저장

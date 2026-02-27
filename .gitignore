@@ -27,4 +27,4 @@ src-tauri/target/
 *.sw?
 
 # sensitive data
-.env
+.envbackend/lambda_package/

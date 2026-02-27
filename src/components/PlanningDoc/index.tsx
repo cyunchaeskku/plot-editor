@@ -6,6 +6,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
+import Image from '@tiptap/extension-image';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { useStore } from '../../store';
 
@@ -47,11 +48,31 @@ export default function PlanningDoc() {
       Color,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontSize,
+      Image.configure({ inline: false, allowBase64: true }),
     ],
     content: '',
     editorProps: {
       attributes: {
         class: 'planning-editor focus:outline-none',
+      },
+      handlePaste: (_view, event, _slice) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const src = e.target?.result as string;
+              if (src) editor?.chain().focus().setImage({ src }).run();
+            };
+            reader.readAsDataURL(file);
+            return true;
+          }
+        }
+        return false;
       },
     },
     onUpdate: ({ editor }) => {

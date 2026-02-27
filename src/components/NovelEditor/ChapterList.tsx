@@ -52,7 +52,7 @@ function ChapterItem({ episode, index, isActive, onClick, onDelete, onRename }: 
       className={`
         flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors group rounded-md mb-0.5
         ${isActive
-          ? 'bg-emerald-800/30 text-emerald-200 border-l-2 border-emerald-500'
+          ? 'bg-[#3d0c04] text-[#f0ddd0] border-l-2 border-[#AD1B02]'
           : 'text-gray-300 hover:bg-gray-800 border-l-2 border-transparent'
         }
       `}
@@ -101,9 +101,11 @@ function ChapterItem({ episode, index, isActive, onClick, onDelete, onRename }: 
 interface ChapterListProps {
   activeChapterEpisodeId: number | null;
   onSelectChapter: (episodeId: number) => void;
+  viewMode: 'single' | 'continuous';
+  onViewModeChange: (mode: 'single' | 'continuous') => void;
 }
 
-export default function ChapterList({ activeChapterEpisodeId, onSelectChapter }: ChapterListProps) {
+export default function ChapterList({ activeChapterEpisodeId, onSelectChapter, viewMode, onViewModeChange }: ChapterListProps) {
   const {
     selectedWorkId,
     works,
@@ -164,10 +166,25 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter }:
         <span className="text-sm font-semibold text-gray-300 truncate">
           {currentWork ? `${currentWork.title} / 챕터` : '챕터'}
         </span>
-        <button
-          onClick={() => setShowNew(true)}
-          className="text-sm text-emerald-400 hover:text-emerald-300"
-        >+ 챕터 추가</button>
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded overflow-hidden border border-gray-700">
+            <button
+              onClick={() => onViewModeChange('single')}
+              className={`px-2 py-0.5 text-xs transition-colors ${viewMode === 'single' ? 'bg-[#AD1B02] text-[#f0ddd0]' : 'text-gray-500 hover:text-gray-300'}`}
+              title="단일 챕터 뷰"
+            >단일</button>
+            <button
+              onClick={() => onViewModeChange('continuous')}
+              className={`px-2 py-0.5 text-xs transition-colors ${viewMode === 'continuous' ? 'bg-[#AD1B02] text-[#f0ddd0]' : 'text-gray-500 hover:text-gray-300'}`}
+              title="연속 챕터 뷰"
+            >연속</button>
+          </div>
+          <button
+            onClick={() => setShowNew(true)}
+            className="text-sm text-[#E88D14] hover:text-[#F3BE26]"
+          >+ 추가</button>
+        </div>
       </div>
 
       {/* New chapter input */}
@@ -184,7 +201,7 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter }:
             placeholder="챕터 제목 입력..."
             className="flex-1 bg-gray-800 text-gray-200 rounded px-3 py-1.5 text-sm outline-none border border-gray-600"
           />
-          <button onClick={handleCreate} className="text-emerald-400 hover:text-emerald-300 text-sm">추가</button>
+          <button onClick={handleCreate} className="text-[#E88D14] hover:text-[#F3BE26] text-sm">추가</button>
           <button onClick={() => setShowNew(false)} className="text-gray-500 text-sm">취소</button>
         </div>
       )}
@@ -197,7 +214,7 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter }:
             <p>챕터가 없습니다</p>
             <button
               onClick={() => setShowNew(true)}
-              className="mt-2 text-emerald-400 hover:text-emerald-300 text-xs"
+              className="mt-2 text-[#E88D14] hover:text-[#F3BE26] text-xs"
             >+ 첫 번째 챕터 추가</button>
           </div>
         ) : (
@@ -208,7 +225,7 @@ export default function ChapterList({ activeChapterEpisodeId, onSelectChapter }:
                   key={ep.id}
                   episode={ep}
                   index={index}
-                  isActive={activeChapterEpisodeId === ep.id}
+                  isActive={viewMode === 'single' && activeChapterEpisodeId === ep.id}
                   onClick={() => onSelectChapter(ep.id)}
                   onDelete={() => deleteEpisode(ep.id)}
                   onRename={(title) => updateEpisode(ep.id, title)}
