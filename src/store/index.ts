@@ -90,7 +90,7 @@ interface AppState {
   loadCharacters: (workId: number) => Promise<void>;
   loadRelations: (workId: number) => Promise<void>;
 
-  createWork: (title: string, type?: WorkType) => void;
+  createWork: (title: string, type?: WorkType) => Promise<void>;
   updateWork: (id: number, title: string) => void;
   updateWorkType: (id: number, type: WorkType) => void;
   deleteWork: (id: number) => void;
@@ -275,7 +275,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── Works ─────────────────────────────────────────────────────────────────
 
-  createWork: (title, type = 'plot') => {
+  createWork: async (title, type = 'plot') => {
     const id = newId();
     const work: Work = {
       id,
@@ -284,14 +284,17 @@ export const useStore = create<AppState>((set, get) => ({
       created_at: new Date().toISOString(),
       planning_doc: '',
     };
-    set((s) => ({
-      works: [...s.works, work],
-      pendingCreates: {
-        ...s.pendingCreates,
-        works: [...s.pendingCreates.works, id],
-      },
-      isDirty: true,
-    }));
+    // Add to local state immediately (optimistic), no dirty flag
+    set((s) => ({ works: [...s.works, work] }));
+    try {
+      await api.apiCreateWork(id, title, type, '');
+      // Select the new work — isDirty is still false so no warning dialog
+      get().selectWork(id);
+    } catch (err) {
+      // Rollback on failure
+      set((s) => ({ works: s.works.filter((w) => w.id !== id) }));
+      console.error('createWork failed:', err);
+    }
   },
 
   updateWork: (id, title) => {
