@@ -79,6 +79,8 @@ interface AppState {
   expandedWorkIds: Set<number>;
   expandedEpisodeIds: Set<number>;
   rightPanelMode: 'editor' | 'character' | 'graph' | 'planning' | 'work-info';
+  sidebarOpen: boolean;
+  middlePanelWidth: number;
 
   // Planning doc
   planningDoc: string;
@@ -136,6 +138,8 @@ interface AppState {
   toggleEpisodeExpand: (id: number) => void;
   setRightPanelMode: (mode: 'editor' | 'character' | 'graph' | 'planning' | 'work-info') => void;
   setWorkSummary: (workId: number, summary: string) => void;
+  setSidebarOpen: (open: boolean) => void;
+  setMiddlePanelWidth: (width: number) => void;
 }
 
 // ── Helper: find a plot across all episode buckets ────────────────────────────
@@ -202,6 +206,8 @@ export const useStore = create<AppState>((set, get) => ({
   expandedWorkIds: new Set(),
   expandedEpisodeIds: new Set(),
   rightPanelMode: 'editor',
+  sidebarOpen: true,
+  middlePanelWidth: 288,
   planningDoc: '',
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -1082,9 +1088,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
 
-  setWorkSummary: (workId, summary) => {
+  setWorkSummary: (workId: number, summary: string) => {
     set((s) => ({
       works: s.works.map((w) => (w.id === workId ? { ...w, work_summary: summary } : w)),
     }));
   },
-}));
+
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+
+  setMiddlePanelWidth: (width) => set({ middlePanelWidth: width }),
+  }));
+

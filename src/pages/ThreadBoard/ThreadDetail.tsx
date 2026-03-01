@@ -123,7 +123,7 @@ function CommentItem({ comment, replies, isLoggedIn, postId, onRefresh, depth = 
   };
 
   return (
-    <div className={depth > 0 ? 'ml-6 mt-2' : ''}>
+    <div>
       <div className="flex items-start gap-2">
         <Avatar name={comment.author_name} color={comment.author_color} size="sm" />
         <div className="flex-1 min-w-0">
@@ -152,9 +152,9 @@ function CommentItem({ comment, replies, isLoggedIn, postId, onRefresh, depth = 
         </div>
       </div>
 
-      {/* Replies */}
-      {replies.length > 0 && (
-        <div className="mt-2 flex flex-col gap-2">
+      {/* Replies + reply input — thread line connects all */}
+      {(replies.length > 0 || showReplyInput) && (
+        <div className="mt-2 ml-[11px] border-l-2 border-gray-400 pl-3 flex flex-col gap-3">
           {replies.map((reply) => (
             <CommentItem
               key={reply.id}
@@ -166,34 +166,32 @@ function CommentItem({ comment, replies, isLoggedIn, postId, onRefresh, depth = 
               depth={1}
             />
           ))}
-        </div>
-      )}
-
-      {/* Reply input */}
-      {showReplyInput && (
-        <div className="ml-6 mt-2 flex items-center gap-2">
-          <input
-            type="text"
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitReply(); }}
-            placeholder="답글을 입력하세요..."
-            className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
-            autoFocus
-          />
-          <button
-            onClick={handleSubmitReply}
-            disabled={isSubmittingReply}
-            className="px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors disabled:opacity-50"
-          >
-            {isSubmittingReply ? '...' : '등록'}
-          </button>
-          <button
-            onClick={() => { setShowReplyInput(false); setReplyText(''); }}
-            className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
-          >
-            취소
-          </button>
+          {showReplyInput && (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitReply(); }}
+                placeholder="답글을 입력하세요..."
+                className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+                autoFocus
+              />
+              <button
+                onClick={handleSubmitReply}
+                disabled={isSubmittingReply}
+                className="px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors disabled:opacity-50"
+              >
+                {isSubmittingReply ? '...' : '등록'}
+              </button>
+              <button
+                onClick={() => { setShowReplyInput(false); setReplyText(''); }}
+                className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+              >
+                취소
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

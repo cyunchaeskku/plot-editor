@@ -17,6 +17,48 @@ import { setToken } from './api';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [middlePanelWidth, setMiddlePanelWidth] = useState(288);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback(
+    (e: MouseEvent) => {
+      if (isResizing) {
+        const sidebarWidth = sidebarOpen ? 224 : 32;
+        const newWidth = e.clientX - sidebarWidth;
+        if (newWidth > 150 && newWidth < 600) {
+          setMiddlePanelWidth(newWidth);
+        }
+      }
+    },
+    [isResizing, sidebarOpen]
+  );
+
+  useEffect(() => {
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
   const {
     rightPanelMode,
@@ -169,7 +211,10 @@ export default function App() {
       </div>
 
       {/* Middle Panel */}
-      <div className="w-72 flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col">
+      <div 
+        className="flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col"
+        style={{ width: middlePanelWidth }}
+      >
         {workType === 'novel' ? (
           <ChapterList
             activeChapterEpisodeId={novelViewMode === 'single' ? selectedEpisodeId : null}
@@ -185,6 +230,14 @@ export default function App() {
           />
         )}
       </div>
+
+      {/* Resizer Handle */}
+      <div
+        onMouseDown={startResizing}
+        className={`w-1 cursor-col-resize hover:bg-[#AD1B02] hover:opacity-50 transition-colors z-10 -ml-[1px] ${
+          isResizing ? 'bg-[#AD1B02] opacity-50' : ''
+        }`}
+      />
 
       {/* Right Panel */}
       <div className="flex-1 overflow-hidden flex flex-col">

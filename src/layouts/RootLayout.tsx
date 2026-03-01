@@ -5,8 +5,7 @@ import { useStore } from '../store';
 import { setToken } from '../api';
 
 export default function RootLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { loadUserInfo, loadWorks } = useStore();
+  const { sidebarOpen, setSidebarOpen, loadUserInfo, loadWorks } = useStore();
 
   // On mount: extract JWT token from URL hash (after OAuth callback), then load user info
   useEffect(() => {
@@ -25,7 +24,7 @@ export default function RootLayout() {
       <div
         className={`${sidebarOpen ? 'w-56' : 'w-8'} flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col transition-all duration-200`}
       >
-        <Sidebar sidebarOpen={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
+        <Sidebar sidebarOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       </div>
 
       {/* Page content (EditorPage or ThreadBoard) */}

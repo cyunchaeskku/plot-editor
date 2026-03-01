@@ -1,6 +1,6 @@
 # Plot Editor — 시나리오 작가를 위한 데스크탑 집필 도구
 
-> A three-panel desktop app for Korean screenwriters and novelists, built with Tauri v2 + React 18 + TipTap v2.
+> A three-panel web app for Korean screenwriters and novelists, built with Tauri v2 + React 18 + TipTap v2.
 
 모든 데이터는 **AWS DynamoDB + S3**에 저장되며, 로컬 메모리에만 유지됩니다. 명시적 저장 시에만 클라우드에 지속됩니다.
 Tauri를 통해 네이티브 데스크탱 바이너리로도 패키징할 수 있습니다.
