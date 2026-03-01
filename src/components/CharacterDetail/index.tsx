@@ -58,7 +58,7 @@ export default function CharacterDetail() {
     setIsDirty(false);
   }, [char?.id]);
 
-  useEffect(() => {
+  const refreshDialogues = () => {
     if (!char) return;
     setDialogues([]);
     setDialoguesLoading(true);
@@ -66,6 +66,10 @@ export default function CharacterDetail() {
       .then(setDialogues)
       .catch(() => setDialogues([]))
       .finally(() => setDialoguesLoading(false));
+  };
+
+  useEffect(() => {
+    refreshDialogues();
   }, [char?.id]);
 
   if (!char) {
@@ -356,7 +360,10 @@ export default function CharacterDetail() {
 
         {/* Dialogues */}
         <div>
-          <label className="text-xs text-gray-500 mb-2 block">대사</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs text-gray-500">대사</label>
+            <button onClick={refreshDialogues} disabled={dialoguesLoading} className="text-xs text-indigo-400 hover:text-indigo-600 disabled:text-gray-300">↻ 새로고침</button>
+          </div>
           {dialoguesLoading ? (
             <p className="text-xs text-gray-400">불러오는 중...</p>
           ) : dialogues.length === 0 ? (

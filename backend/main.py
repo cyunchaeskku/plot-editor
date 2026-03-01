@@ -66,9 +66,8 @@ def _extract_dialogues(nodes: list, target_name: str) -> list[str]:
         if node.get("type") == "dialogue" and node.get("attrs", {}).get("characterName") == target_name:
             texts = []
             for child in node.get("content") or []:
-                for inline in child.get("content") or []:
-                    if inline.get("type") == "text":
-                        texts.append(inline.get("text", ""))
+                if child.get("type") == "text":
+                    texts.append(child.get("text", ""))
             text = "".join(texts).strip()
             if text:
                 result.append(text)
@@ -595,7 +594,7 @@ async def summarize_character(character_id: int, request: Request):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
 
     from langchain_openai import ChatOpenAI
-    from langchain.schema import SystemMessage, HumanMessage
+    from langchain_core.messages import SystemMessage, HumanMessage
 
     llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
     messages = [
