@@ -58,6 +58,8 @@ export default function CharacterDetail() {
       setProperties([]);
     }
     setIsDirty(false);
+    setLlmContext('');
+    setLlmContextOpen(false);
   }, [char?.id]);
 
   const refreshDialogues = () => {
