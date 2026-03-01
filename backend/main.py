@@ -287,46 +287,78 @@ async def update_work(work_id: int, request: Request):
 async def summarize_work(work_id: int, request: Request):
     sub = _require_login(request)
 
-    # Collect chapter_summary from all episodes of this work
-    eps_res = _episodes_table.scan(
-        FilterExpression="user_sub = :s AND work_id = :w",
-        ExpressionAttributeValues={":s": sub, ":w": work_id},
-    )
-    episodes = sorted(eps_res.get("Items", []), key=lambda x: x.get("order_index", 0))
-
-    chapter_summaries = []
-    for ep in episodes:
-        summary = ep.get("chapter_summary", "").strip()
-        if summary:
-            chapter_summaries.append(f"[{ep.get('title', '챕터')}]\n{summary}")
-
-    if not chapter_summaries:
-        raise HTTPException(status_code=400, detail="챕터 요약이 없습니다. 먼저 각 챕터를 AI로 요약해주세요.")
-
-    context = "\n\n".join(chapter_summaries)
-
-    openai_key = os.getenv("OPENAI_API_KEY", "")
-    if not openai_key:
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
-
     try:
         req_body = await request.json()
     except Exception:
         req_body = {}
     existing_summary = (req_body.get("existing_summary") or "").strip()
 
+    # Get work type
+    work_item = _works_table.get_item(Key={"work_id": f"{sub}#{work_id}"}).get("Item")
+    work_type = (work_item or {}).get("type", "novel")
+
+    # Collect episode list (needed for both types)
+    eps_res = _episodes_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    episodes = sorted(eps_res.get("Items", []), key=lambda x: x.get("order_index", 0))
+
+    if work_type == "plot":
+        # Collect plot_summary from all plots of this work
+        plot_summaries = []
+        for ep in episodes:
+            ep_local_id = int(ep.get("local_id", 0))
+            plots_res = _plots_table.scan(
+                FilterExpression="user_sub = :s AND episode_id = :e",
+                ExpressionAttributeValues={":s": sub, ":e": ep_local_id},
+            )
+            ep_plots = sorted(plots_res.get("Items", []), key=lambda x: x.get("order_index", 0))
+            for plot in ep_plots:
+                ps = (plot.get("plot_summary") or "").strip()
+                if ps:
+                    plot_title = plot.get("title", "플롯")
+                    plot_summaries.append(f"[{plot_title}]\n{ps}")
+
+        if not plot_summaries:
+            raise HTTPException(status_code=400, detail="플롯 요약이 없습니다. 먼저 각 플롯을 AI로 요약해주세요.")
+
+        context = "\n\n".join(plot_summaries)
+
+        if existing_summary:
+            system_prompt = "주어진 각 플롯 요약을 바탕으로 작품 전체 내용을 다시 요약하세요. 기존 요약의 흐름을 최대한 유지하되, 새로운 플롯 정보가 있으면 자연스럽게 반영하세요."
+            user_content = f"[기존 요약]\n{existing_summary}\n\n[플롯별 요약]\n{context}"
+        else:
+            system_prompt = "주어진 각 플롯 요약을 읽고, 이 작품 전체의 줄거리와 핵심 흐름을 간결하게 요약하세요."
+            user_content = context
+    else:
+        # Novel: collect chapter_summary from episodes
+        chapter_summaries = []
+        for ep in episodes:
+            summary = ep.get("chapter_summary", "").strip()
+            if summary:
+                chapter_summaries.append(f"[{ep.get('title', '챕터')}]\n{summary}")
+
+        if not chapter_summaries:
+            raise HTTPException(status_code=400, detail="챕터 요약이 없습니다. 먼저 각 챕터를 AI로 요약해주세요.")
+
+        context = "\n\n".join(chapter_summaries)
+
+        if existing_summary:
+            system_prompt = "주어진 각 챕터 요약을 바탕으로 작품 전체 내용을 다시 요약하세요. 기존 요약의 흐름을 최대한 유지하되, 새로운 챕터 정보가 있으면 자연스럽게 반영하세요."
+            user_content = f"[기존 요약]\n{existing_summary}\n\n[챕터별 요약]\n{context}"
+        else:
+            system_prompt = "주어진 각 챕터 요약을 읽고, 이 작품 전체의 줄거리와 핵심 흐름을 간결하게 요약하세요."
+            user_content = context
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
+
     from langchain_openai import ChatOpenAI
     from langchain_core.messages import SystemMessage, HumanMessage
 
     llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
-
-    if existing_summary:
-        system_prompt = "주어진 각 챕터 요약을 바탕으로 작품 전체 내용을 다시 요약하세요. 기존 요약의 흐름을 최대한 유지하되, 새로운 챕터 정보가 있으면 자연스럽게 반영하세요."
-        user_content = f"[기존 요약]\n{existing_summary}\n\n[챕터별 요약]\n{context}"
-    else:
-        system_prompt = "주어진 각 챕터 요약을 읽고, 이 작품 전체의 줄거리와 핵심 흐름을 간결하게 요약하세요."
-        user_content = context
-
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=user_content),

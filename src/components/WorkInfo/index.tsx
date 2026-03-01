@@ -58,7 +58,7 @@ export default function WorkInfo() {
       setWorkSummary(selectedWorkId, res.summary);
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('챕터 요약이 없습니다')) {
+      if (msg.includes('챕터 요약이 없습니다') || msg.includes('플롯 요약이 없습니다')) {
         alert(isNovel
           ? '먼저 각 챕터에서 AI 챕터 요약을 생성해주세요.'
           : '먼저 각 플롯에서 AI 플롯 요약을 생성해주세요.');
