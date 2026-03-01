@@ -24,6 +24,7 @@ export interface Plot {
   title: string;
   content: string;
   order_index: number;
+  plot_summary?: string;
 }
 
 export interface Character {

@@ -61,6 +61,7 @@ function normalizePlot(item: any, content = '{}'): Plot {
     title: item.title || '',
     content,
     order_index: Number(item.order_index ?? 0),
+    plot_summary: item.plot_summary || undefined,
   };
 }
 
@@ -162,6 +163,10 @@ export async function apiDeleteEpisode(id: number): Promise<void> {
 
 export async function summarizeChapter(episodeId: number): Promise<{ summary: string }> {
   return apiFetch('POST', `/episodes/${episodeId}/summarize`);
+}
+
+export async function summarizePlot(plotId: number): Promise<{ summary: string }> {
+  return apiFetch('POST', `/plots/${plotId}/summarize`);
 }
 
 // ── Plots ──────────────────────────────────────────────────────────────────────

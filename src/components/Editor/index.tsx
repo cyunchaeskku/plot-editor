@@ -5,6 +5,7 @@ import { SceneHeading, Dialogue, Narration, StageDirection } from './nodes';
 import Underline from '@tiptap/extension-underline';
 import SlashMenu from './SlashMenu';
 import { useStore } from '../../store';
+import { summarizePlot } from '../../api';
 
 interface SlashMenuState {
   visible: boolean;
@@ -42,6 +43,7 @@ export default function Editor() {
     selectedWorkId,
     characters,
     setPlotContent,
+    setPlotSummary,
     selectPlot,
   } = useStore();
 
@@ -49,6 +51,8 @@ export default function Editor() {
   const [slashMenu, setSlashMenu] = useState<SlashMenuState>({ visible: false, position: { top: 0, left: 0 } });
   const [showDialogueMenu, setShowDialogueMenu] = useState(false);
   const [lineNumbers, setLineNumbers] = useState<{ top: number; line: number }[]>([]);
+  const [plotSummaryLoading, setPlotSummaryLoading] = useState(false);
+  const [showPlotSummary, setShowPlotSummary] = useState(false);
   const dialogueMenuRef = useRef<HTMLDivElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const isLoadingRef = useRef(false);
@@ -242,6 +246,8 @@ export default function Editor() {
     .map((id) => ({ id, plot: episodePlots.find((p) => p.id === id) }))
     .filter((x) => x.plot);
 
+  const activePlot = activePlotId ? episodePlots.find((p) => p.id === activePlotId) : null;
+
   return (
     <div className="flex flex-col h-full">
       {/* Plot tabs (when multiple selected) */}
@@ -368,6 +374,55 @@ export default function Editor() {
           onClose={() => setSlashMenu((s) => ({ ...s, visible: false }))}
         />
       )}
+
+      {/* Plot summary panel */}
+      {showPlotSummary && activePlot?.plot_summary && (
+        <div className="flex-shrink-0 border-t border-indigo-100 bg-indigo-50 px-4 py-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-indigo-600">AI 플롯 요약</span>
+            <button
+              onClick={() => setShowPlotSummary(false)}
+              className="text-indigo-300 hover:text-indigo-500 text-xs px-1"
+            >✕</button>
+          </div>
+          <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+            {activePlot.plot_summary}
+          </p>
+        </div>
+      )}
+
+      {/* Status bar */}
+      <div className="h-8 flex items-center justify-between px-4 bg-[#1a1a2e] border-t border-gray-800 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {activePlot?.plot_summary && (
+            <button
+              onClick={() => setShowPlotSummary((v) => !v)}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300"
+            >
+              {showPlotSummary ? '▼ 요약 닫기' : '▲ AI 요약 보기'}
+            </button>
+          )}
+        </div>
+        <button
+          onClick={async () => {
+            if (!activePlotId) return;
+            setPlotSummaryLoading(true);
+            try {
+              const res = await summarizePlot(activePlotId);
+              setPlotSummary(activePlotId, res.summary);
+              setShowPlotSummary(true);
+            } catch {
+              alert('플롯 요약 생성에 실패했습니다. 백엔드가 실행 중인지 확인하세요.');
+            } finally {
+              setPlotSummaryLoading(false);
+            }
+          }}
+          disabled={plotSummaryLoading}
+          className="text-[11px] text-indigo-500 hover:text-indigo-300 disabled:text-gray-600 border border-indigo-800 hover:border-indigo-600 rounded px-2 py-0.5 transition-colors"
+        >
+          {plotSummaryLoading ? '요약 중...' : 'AI로 이 플롯 내용 요약하기'}
+        </button>
+      </div>
     </div>
   );
 }

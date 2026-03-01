@@ -104,6 +104,7 @@ interface AppState {
   createPlot: (episodeId: number, title: string) => Promise<void>;
   updatePlot: (id: number, title: string, content: string) => void;
   setPlotContent: (plotId: number, content: string) => void;
+  setPlotSummary: (id: number, summary: string) => void;
   reorderPlots: (episodeId: number, plots: Plot[]) => void;
   deletePlot: (id: number) => void;
 
@@ -128,7 +129,7 @@ interface AppState {
 
   selectWork: (id: number) => void;
   selectEpisode: (id: number) => void;
-  selectPlot: (id: number, multi?: boolean) => void;
+  selectPlot: (id: number, multi?: boolean, episodeId?: number) => void;
   selectCharacter: (id: number | null) => void;
   toggleWorkExpand: (id: number) => void;
   toggleEpisodeExpand: (id: number) => void;
@@ -452,6 +453,20 @@ export const useStore = create<AppState>((set, get) => ({
         }
       }
       return { episodes: newEpisodes };
+    });
+  },
+
+  setPlotSummary: (id, summary) => {
+    set((s) => {
+      const newPlots = { ...s.plots };
+      for (const [epId, ps] of Object.entries(s.plots)) {
+        const idx = ps.findIndex((p) => p.id === id);
+        if (idx !== -1) {
+          newPlots[Number(epId)] = ps.map((p, i) => (i === idx ? { ...p, plot_summary: summary } : p));
+          break;
+        }
+      }
+      return { plots: newPlots };
     });
   },
 
@@ -1023,17 +1038,21 @@ export const useStore = create<AppState>((set, get) => ({
     get().loadPlots(id);
   },
 
-  selectPlot: (id, multi = false) => {
+  selectPlot: (id, multi = false, episodeId?: number) => {
     set((s) => {
+      const episodeUpdate = episodeId && episodeId !== s.selectedEpisodeId
+        ? { selectedEpisodeId: episodeId }
+        : {};
       if (multi) {
         const already = s.selectedPlotIds.includes(id);
         return {
+          ...episodeUpdate,
           selectedPlotIds: already
             ? s.selectedPlotIds.filter((pid) => pid !== id)
             : [...s.selectedPlotIds, id],
         };
       }
-      return { selectedPlotIds: [id] };
+      return { ...episodeUpdate, selectedPlotIds: [id] };
     });
   },
 

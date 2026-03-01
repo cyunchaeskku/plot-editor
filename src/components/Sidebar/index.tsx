@@ -299,7 +299,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
                                 <div
                                   key={plot.id}
                                   className={`flex items-center gap-1 pl-12 pr-2 py-1 cursor-pointer hover:bg-[#1e0e08] group ${isPlotSelected ? 'bg-[#AD1B02]/20 text-[#F3BE26]' : 'text-[#c0a090]'}`}
-                                  onClick={(e) => selectPlot(plot.id, e.metaKey || e.ctrlKey)}
+                                  onClick={(e) => selectPlot(plot.id, e.metaKey || e.ctrlKey, ep.id)}
                                 >
                                   <span className="text-gray-600 text-xs w-5">P{idx + 1}</span>
                                   <span className="flex-1 truncate text-xs">{plot.title || '(제목 없음)'}</span>

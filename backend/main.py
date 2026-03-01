@@ -505,6 +505,45 @@ async def update_plot_meta(plot_id: int, request: Request):
     return {"ok": True}
 
 
+@app.post("/plots/{plot_id}/summarize")
+async def summarize_plot(plot_id: int, request: Request):
+    sub = _require_login(request)
+
+    s3_key = f"plots/{sub}/{plot_id}.json"
+    try:
+        obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
+        content = json.loads(obj["Body"].read())
+        plot_text = _extract_plain_text(content.get("content", []))
+    except Exception:
+        raise HTTPException(status_code=404, detail="플롯 내용을 찾을 수 없습니다.")
+
+    if not plot_text.strip():
+        raise HTTPException(status_code=400, detail="플롯에 내용이 없습니다.")
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
+
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+    messages = [
+        SystemMessage(content="주어진 플롯 내용을 읽고, 이 플롯에서 벌어진 주요 사건을 3~4줄로 간결하게 요약하세요."),
+        HumanMessage(content=plot_text.strip()),
+    ]
+    response = await llm.ainvoke(messages)
+    summary = response.content
+
+    _plots_table.update_item(
+        Key={"plot_id": f"{sub}#{plot_id}"},
+        UpdateExpression="SET plot_summary = :ps",
+        ExpressionAttributeValues={":ps": summary},
+    )
+
+    return {"summary": summary}
+
+
 @app.delete("/plots/{plot_id}")
 async def delete_plot(plot_id: int, request: Request):
     sub = _require_login(request)
