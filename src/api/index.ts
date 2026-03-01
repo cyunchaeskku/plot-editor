@@ -260,8 +260,8 @@ export async function fetchCharacterDialogues(characterId: number): Promise<Char
   return apiFetch('GET', `/characters/${characterId}/dialogues`);
 }
 
-export async function generateCharacterSummary(characterId: number): Promise<{ summary: string }> {
-  return apiFetch('POST', `/characters/${characterId}/summarize`);
+export async function generateCharacterSummary(characterId: number, existingSummary = ''): Promise<{ summary: string }> {
+  return apiFetch('POST', `/characters/${characterId}/summarize`, { existing_summary: existingSummary });
 }
 
 export async function apiDeleteCharacter(id: number): Promise<void> {

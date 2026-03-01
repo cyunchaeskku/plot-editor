@@ -593,13 +593,27 @@ async def summarize_character(character_id: int, request: Request):
     if not openai_key:
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
 
+    try:
+        req_body = await request.json()
+    except Exception:
+        req_body = {}
+    existing_summary = (req_body.get("existing_summary") or "").strip()
+
     from langchain_openai import ChatOpenAI
     from langchain_core.messages import SystemMessage, HumanMessage
 
     llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+
+    if existing_summary:
+        system_prompt = "주어진 인물 정보와 기존 요약을 바탕으로, 새로운 대사와 정보를 반영하여 요약을 갱신하세요. 기존 요약의 내용을 최대한 유지하되, 달라진 부분이 있으면 자연스럽게 업데이트하세요."
+        user_content = f"[기존 요약]\n{existing_summary}\n\n[최신 인물 정보]\n{context}"
+    else:
+        system_prompt = "주어진 내용을 바탕으로 이 인물의 성격, 타 인물과의 관계, 그리고 지금까지의 행보를 간단히 요약하세요."
+        user_content = context
+
     messages = [
-        SystemMessage(content="주어진 내용을 바탕으로 이 인물의 성격, 타 인물과의 관계, 그리고 지금까지의 행보를 간단히 요약하세요."),
-        HumanMessage(content=context),
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_content),
     ]
     response = await llm.ainvoke(messages)
     return {"summary": response.content}

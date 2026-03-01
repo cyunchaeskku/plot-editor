@@ -95,9 +95,12 @@ export default function CharacterDetail() {
   const handleGenerateSummary = async () => {
     setAiSummaryLoading(true);
     try {
-      const res = await generateCharacterSummary(char.id);
+      const res = await generateCharacterSummary(char.id, aiSummary);
       setAiSummary(res.summary);
-      setIsDirty(true);
+      // 생성 즉시 자동 저장
+      const propsObj = Object.fromEntries(properties.filter((p) => p.key).map((p) => [p.key, p.value]));
+      await updateCharacter(char.id, name, color, JSON.stringify(propsObj), memo, image, res.summary);
+      setIsDirty(false);
     } catch (err) {
       alert('AI 요약 생성에 실패했습니다. 백엔드가 실행 중인지 확인하세요.');
     } finally {
@@ -386,21 +389,35 @@ export default function CharacterDetail() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs text-gray-500">AI 인물 요약</label>
-            <button
-              onClick={handleGenerateSummary}
-              disabled={aiSummaryLoading}
-              className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-2 py-1 rounded transition-colors"
-            >
-              {aiSummaryLoading ? '생성 중...' : '요약 생성'}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {aiSummary && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(aiSummary)}
+                  className="text-xs text-gray-400 hover:text-gray-600 px-1.5 py-1 rounded border border-gray-200"
+                  title="클립보드에 복사"
+                >복사</button>
+              )}
+              <button
+                onClick={handleGenerateSummary}
+                disabled={aiSummaryLoading}
+                className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-2 py-1 rounded transition-colors"
+              >
+                {aiSummaryLoading ? '생성 중...' : '요약 생성'}
+              </button>
+            </div>
           </div>
-          <textarea
-            value={aiSummary}
-            onChange={(e) => { setAiSummary(e.target.value); setIsDirty(true); }}
-            placeholder="'요약 생성' 버튼을 눌러 AI가 인물을 분석하게 하세요"
-            rows={5}
-            className="w-full bg-white text-gray-700 rounded px-2 py-1.5 text-xs outline-none border border-gray-200 resize-none"
-          />
+          {aiSummary ? (
+            <textarea
+              value={aiSummary}
+              onChange={(e) => { setAiSummary(e.target.value); setIsDirty(true); }}
+              rows={5}
+              className="w-full bg-white text-gray-700 rounded px-2 py-1.5 text-xs outline-none border border-gray-200 resize-none"
+            />
+          ) : (
+            <div className="w-full bg-gray-50 border border-dashed border-gray-200 rounded px-2 py-4 text-center text-xs text-gray-400">
+              {aiSummaryLoading ? '생성 중...' : "'요약 생성' 버튼을 눌러 AI가 인물을 분석하게 하세요"}
+            </div>
+          )}
         </div>
       </div>
     </div>
