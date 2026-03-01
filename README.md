@@ -2,8 +2,8 @@
 
 > A three-panel desktop app for Korean screenwriters and novelists, built with Tauri v2 + React 18 + TipTap v2.
 
-모든 데이터는 **로컬 IndexedDB**에 저장되며 서버가 필요 없습니다.
-Tauri를 통해 네이티브 데스크탑 바이너리로도 패키징할 수 있습니다.
+모든 데이터는 **AWS DynamoDB + S3**에 저장되며, 로컬 메모리에만 유지됩니다. 명시적 저장 시에만 클라우드에 지속됩니다.
+Tauri를 통해 네이티브 데스크탱 바이너리로도 패키징할 수 있습니다.
 
 ---
 
@@ -66,6 +66,8 @@ Tauri를 통해 네이티브 데스크탑 바이너리로도 패키징할 수 �
 
 ### 등장인물 관리
 - 인물별 **색상 태그**, 자유 형식 **특성 목록** (키-값), **메모**, **프로필 이미지**
+- **AI 인물 요약** — OpenAI GPT-4o-mini로 자동 생성 (성격, 타 인물과의 관계, 행보 분석)
+- **대사 패널** — 전체 작품에서 해당 인물이 한 모든 대사 검색 및 표시 (에피소드·플롯·텍스트)
 - 인물 이름·색상 변경 시 모든 대사 블록 **자동 동기화**
 - 삭제 시 관련 관계 일괄 삭제
 
@@ -171,7 +173,6 @@ Left Sidebar       │  Middle Panel        │  Right Panel
 | 빌드 도구 | Vite | 7 |
 | 스타일 | Tailwind CSS | 3 |
 | 상태 관리 | Zustand | 5 |
-| 로컬 DB | IndexedDB (idb) | 8 |
 | 에디터 | TipTap v2 (StarterKit + 커스텀 노드) | 3.x |
 | 마크다운 에디터 | @uiw/react-md-editor | 4 |
 | 드래그 앤 드롭 | dnd-kit | 6 / 10 |
@@ -196,7 +197,7 @@ python main.py   # localhost:8000
 ### 환경변수 (`backend/.env`, gitignore 처리됨)
 
 ```dotenv
-SECRET_KEY=<임의의 긴 랜덤 문자열>
+SECRET_KEY=<임의의 긴 랜덤 문자열, JWT 서명용>
 
 # AWS Cognito
 COGNITO_REGION=ap-northeast-2
@@ -213,6 +214,9 @@ FRONTEND_URL=https://plot-editor.vercel.app/
 AWS_ACCESS_KEY_ID=<IAM 액세스 키>
 AWS_SECRET_ACCESS_KEY=<IAM 시크릿 키>
 S3_BUCKET=plot-editor-contents
+
+# OpenAI (AI 인물 요약용)
+OPENAI_API_KEY=<OpenAI API 키>
 ```
 
 ---
@@ -296,36 +300,42 @@ App.tsx
 컴포넌트
    │  useStore() 훅으로 읽기 / 액션 호출
    ▼
-src/store/index.ts  (Zustand)
-   │  db.* 함수 호출
+src/store/index.ts  (Zustand, 로컬 메모리)
+   │  대기 중인 변경사항 큐 누적
+   │  Save 버튼 클릭 시 saveAll() 호출
    ▼
-src/db/index.ts  (IndexedDB via idb)
-   │
+src/api/index.ts  (AWS REST API)
+   │  DynamoDB / S3에 저장
    ▼
-브라우저 IndexedDB  (plotEditorDB v2)
+AWS DynamoDB + S3 (클라우드 source of truth)
 ```
 
-컴포넌트는 `src/db` 를 직접 호출하지 않고 반드시 `useStore` 를 통해서만 상태를 변경합니다.
+컴포넌트는 `src/api` 를 직접 호출하지 않고 반드시 `useStore` 를 통해서만 상태를 변경합니다. 모든 변경사항은 메모리에만 저장되며, 명시적 `saveAll()` 호출 시에만 클라우드에 지속됩니다.
 
-### IndexedDB 스키마
+### DynamoDB + S3 스키마
 
-```
-works (id PK, title, type, created_at, planning_doc)
-  └── episodes (id PK, work_id FK, title, order_index)
-        └── plots (id PK, episode_id FK, title, content JSON, order_index)
+**메타데이터 (DynamoDB):**
+- `works`: work_id, user_id(sub), title, type, planning_doc, created_at, updated_at
+- `episodes`: episode_id, user_sub, work_id, title, order_index, created_at, updated_at
+- `plots`: plot_id, user_sub, episode_id, title, content_s3_key, order_index, created_at, updated_at
+- `characters`: character_id, user_sub, work_id, name, color, properties, memo, image, ai_summary, created_at, updated_at
+- `character_relations`: relation_id, user_sub, work_id, from_character_id, to_character_id, relation_name, created_at
+- `graph_layouts`: layout_id, user_sub, work_id, layout_data (JSON), updated_at
 
-characters (id PK, work_id FK, name, color, properties JSON, memo, image)
-  └── characterRelations (id PK, from_character_id FK, to_character_id FK, relation_name)
-```
+**콘텐츠 (S3):**
+- `plots/{sub}/{plot_id}.json` — TipTap JSON
 
-- `plots.content` — TipTap JSON을 `JSON.stringify()` 한 문자열
-- `characters.properties` — 자유 키-값 쌍의 JSON 객체 문자열
-- 작품 삭제 시 에피소드 → 플롯 / 인물 → 관계 모두 캐스케이드 삭제
+모든 테이블의 PK는 `{sub}#{local_id}` 형식으로 사용자별 데이터 격리.
 
-### 자동 저장
+### 명시적 저장
 
-에디터 업데이트마다 **500ms 디바운스**로 저장합니다.
-`isLoadingRef` 플래그로 프로그래매틱 콘텐츠 로드 중에는 저장을 건너뜁니다.
+에디터 업데이트 시 메모리만 변경되고, 대기 중인 변경사항 큐(`pendingCreates/Updates/Deletes`)에 추가됩니다.
+사용자가 Save 버튼 클릭 또는 `Cmd+S` / `Ctrl+S` 단축키로 명시적 저장을 시작할 때만 `saveAll(workId)` 실행:
+1. 대기 중인 큐 정리 (net-zero 최적화)
+2. API 호출 순서: 삭제 → 생성 → 업데이트
+3. 각 plot의 콘텐츠를 S3에 저장
+
+로컬 메모리이므로 페이지 새로고침 시 최후 저장본으로 복구됩니다.
 
 ---
 
@@ -334,12 +344,14 @@ characters (id PK, work_id FK, name, color, properties JSON, memo, image)
 ```
 plot_editor/
 ├── src/
-│   ├── App.tsx                    # 루트 레이아웃, 작품 유형 분기
+│   ├── App.tsx                    # 루트 레이아웃, 작품 유형 분기, JWT 토큰 관리
 │   ├── App.css                    # Tailwind 지시문 + TipTap 노드 CSS + 슬래시 메뉴 CSS
 │   ├── db/
-│   │   └── index.ts               # IndexedDB 쿼리 함수 + 타입 정의 (Work, Episode, Plot, Character, CharacterRelation)
+│   │   └── index.ts               # TypeScript 타입 정의만 (Work, Episode, Plot, Character, CharacterRelation)
+│   ├── api/
+│   │   └── index.ts               # AWS REST API 레이어, 응답 정규화, JWT 헤더 관리
 │   ├── store/
-│   │   └── index.ts               # Zustand 전역 상태 + 모든 액션
+│   │   └── index.ts               # Zustand 전역 상태 (메모리 + 대기 변경사항 큐) + 모든 액션
 │   └── components/
 │       ├── Sidebar/               # 좌측: 작품/에피소드/플롯 트리, 인물 목록
 │       ├── PlotPanel/             # 중앙 (plot 모드): 플롯 카드 + dnd-kit 정렬
@@ -395,3 +407,5 @@ plot_editor/
 | 2026-02-25 | 초기 Tauri v2 마이그레이션, SQLite 전환, 기본 3패널 구현 |
 | 2026-02-26 | 소설 모드(novel) 추가, 기획서 패널, 관계도 PNG 내보내기, 줄 번호 표시, DOCX 서식 개선 |
 | 2026-02-27 | FastAPI 백엔드, Cognito OIDC 인증, DynamoDB + S3 클라우드 동기화, GraphView 레이아웃 저장 |
+| 2026-02-28 | IndexedDB 제거, AWS single-write 패턴 전환, 명시적 Save 버튼 + Cmd+S, 전역 상태 재작성 |
+| 2026-03-01 | 세션 → JWT Bearer 토큰 인증, Character Dialogues 패널, AI 인물 요약 (GPT-4o-mini), 버그 수정 |

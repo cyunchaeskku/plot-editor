@@ -94,16 +94,16 @@ Permissions are declared in `src-tauri/capabilities/default.json`. **Adding a ne
 
 Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.md for env var list.
 
-**Authentication**: Cognito OIDC via `authlib`. Session stored in `starlette SessionMiddleware`. `_require_login(request)` helper returns the user's Cognito `sub` or raises HTTP 401.
+**Authentication**: Cognito OIDC via `authlib`. JWT Bearer token issued at OAuth callback (`/authorize`), valid for 30 days (HS256, signed with `SECRET_KEY`). `_require_login(request)` helper reads `Authorization: Bearer {token}` header and decodes JWT, or raises HTTP 401.
 
-**Endpoints** (17 total):
+**Endpoints** (19 total):
 
 | Group | Method + Path | Notes |
 |---|---|---|
 | Auth | `GET /login` | Redirect to Cognito Hosted UI |
-| Auth | `GET /authorize` | OAuth callback; writes user to DynamoDB `users` |
-| Auth | `GET /me` | Return `{sub, email}` |
-| Auth | `GET /logout` | Clear session + redirect to Cognito logout |
+| Auth | `GET /authorize` | OAuth callback; issues JWT (30-day expiry), redirects to `{FRONTEND_URL}#token={jwt}` |
+| Auth | `GET /me` | Decode JWT, return `{sub, email}` |
+| Auth | `GET /logout` | Redirect to Cognito logout (JWT stateless, frontend clears token) |
 | Works | `GET/POST /works` | List / create |
 | Works | `PUT/DELETE /works/{id}` | Update / delete |
 | Episodes | `GET/POST /works/{id}/episodes` | List / create |
@@ -112,27 +112,34 @@ Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.
 | Plots | `PUT/DELETE /plots/{id}` | Update meta / delete (also deletes S3 object) |
 | Plots | `PUT /plots/{id}/content` | Save TipTap JSON to S3 |
 | Plots | `GET /plots/{id}/content` | Read TipTap JSON from S3 |
-| Characters | `GET/POST /works/{id}/characters` | List / create |
-| Characters | `PUT/DELETE /characters/{id}` | Update / delete |
+| Characters | `GET/POST /works/{id}/characters` | List / create (includes `ai_summary` field) |
+| Characters | `PUT/DELETE /characters/{id}` | Update (with `ai_summary`) / delete |
+| Characters | `GET /characters/{id}/dialogues` | Fetch all dialogues for character across all plots in work |
+| Characters | `POST /characters/{id}/summarize` | Generate AI character summary via OpenAI GPT-4o-mini |
 | Relations | `GET/POST /works/{id}/relations` | List / create |
 | Relations | `DELETE /relations/{id}` | Delete |
 | Graph | `GET/PUT /graph-layout/{workId}` | Node positions `{charId: {x,y}}` |
 
 ### Cloud Sync
 
-Local SQLite and DynamoDB/S3 follow a **dual-write** pattern:
-- App works fully offline via SQLite (Tauri appdir `ploteditor.db`).
-- When the backend is running, writes are mirrored to the cloud fire-and-forget.
+Data persistence follows a **single-write on-demand** pattern:
+- All data stored in memory (Zustand store); no local SQLite or IndexedDB.
+- On user-triggered save (`saveAll(workId)`), all pending mutations are batched and sent to AWS.
+- Data only persists in DynamoDB/S3 after explicit save; page refresh resets to last cloud state.
 
-**DynamoDB PK design**: All table PKs use `{Cognito sub}#{local SQLite id}` — e.g. `plot_id: "abc123#42"`. This namespaces data per user without separate tables.
+**DynamoDB PK design**: All table PKs use `{Cognito sub}#{local_id}` — e.g. `character_id: "abc123#42"`. This namespaces data per user without separate tables.
 
-**S3 content storage**: TipTap JSON is stored at key `plots/{sub}/{plot_id}.json` in bucket `plot-editor-contents`. DynamoDB `plots` item stores `content_s3_key` pointer and `updated_at`.
+**S3 content storage**: TipTap JSON is stored at key `plots/{sub}/{plot_id}.json` in bucket `plot-editor-contents`. DynamoDB `plots` item stores metadata and updated_at timestamp.
 
 **Frontend integration**:
-- `Editor/index.tsx`: After the 500ms SQLite debounce save, fires `PUT /plots/{id}/content` to S3 (fire-and-forget, errors silently ignored).
-- `GraphView/index.tsx`: On mount, fetches `GET /graph-layout/{workId}` to restore node positions. On `onNodeDragStop`, debounces 1 s then calls `PUT /graph-layout/{workId}`.
+- `src/App.tsx`: On mount, extracts `#token=...` from URL hash, saves to `localStorage` (key: `plot_editor_token`), clears hash.
+- `src/api/index.ts`: All `apiFetch` calls include `Authorization: Bearer {token}` header (JWT from localStorage).
+- `src/components/Sidebar/index.tsx`: On logout, calls `clearToken()` before redirecting.
+- `src/components/GraphView/index.tsx`: Graph layout fetch calls also use Bearer token header.
 
-All fetch calls include `credentials: 'include'` for session cookie forwarding from the Tauri webview.
+All API calls include JWT in Authorization header instead of cookies.
+
+**Lambda deployment note**: Python packages required by Lambda (`langchain`, `langchain-openai`, `openai`, `PyJWT`) must be manually installed in `backend/lambda_package/` directory (not just `requirements.txt`). Run `pip install -t lambda_package -r requirements.txt` before deploying via `serverless deploy`.
 
 ## Work Log
 
