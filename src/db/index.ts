@@ -14,6 +14,7 @@ export interface Episode {
   work_id: number;
   title: string;
   order_index: number;
+  chapter_summary?: string;
 }
 
 export interface Plot {

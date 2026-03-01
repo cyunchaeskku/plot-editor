@@ -49,6 +49,7 @@ function normalizeEpisode(item: any): Episode {
     work_id: Number(item.work_id),
     title: item.title || '',
     order_index: Number(item.order_index ?? 0),
+    chapter_summary: item.chapter_summary || '',
   };
 }
 
@@ -152,6 +153,10 @@ export async function apiUpdateEpisode(
 
 export async function apiDeleteEpisode(id: number): Promise<void> {
   await apiFetch('DELETE', `/episodes/${id}`);
+}
+
+export async function summarizeChapter(episodeId: number): Promise<{ summary: string }> {
+  return apiFetch('POST', `/episodes/${episodeId}/summarize`);
 }
 
 // ── Plots ──────────────────────────────────────────────────────────────────────

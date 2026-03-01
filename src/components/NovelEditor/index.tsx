@@ -8,6 +8,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import CharacterCount from '@tiptap/extension-character-count';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak as DocxPageBreak } from 'docx';
 import { useStore } from '../../store';
+import { summarizeChapter } from '../../api';
 import { LineHeight } from './extensions/LineHeight';
 import { PageBreak } from './extensions/PageBreak';
 import { FindReplace } from './extensions/FindReplace';
@@ -19,7 +20,7 @@ interface NovelEditorProps {
 }
 
 export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
-  const { plots, selectedEpisodeId, setPlotContent, selectedWorkId, works, episodes } = useStore();
+  const { plots, selectedEpisodeId, setPlotContent, selectedWorkId, works, episodes, setEpisodeChapterSummary } = useStore();
   const isLoadingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,6 +31,13 @@ export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
 
   const episodePlots = selectedEpisodeId ? (plots[selectedEpisodeId] || []) : [];
   const currentPlot = chapterPlotId ? episodePlots.find((p) => p.id === chapterPlotId) : null;
+
+  const currentEpisode = selectedEpisodeId
+    ? (episodes[selectedWorkId ?? -1] || []).find((e) => e.id === selectedEpisodeId) ?? null
+    : null;
+
+  const [chapterSummaryLoading, setChapterSummaryLoading] = useState(false);
+  const [showChapterSummary, setShowChapterSummary] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -58,6 +66,11 @@ export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
       setPlotContent(chapterPlotId, content);
     },
   });
+
+  // Reset summary panel when chapter changes
+  useEffect(() => {
+    setShowChapterSummary(false);
+  }, [selectedEpisodeId]);
 
   // Load content when chapterPlotId changes
   useEffect(() => {
@@ -355,16 +368,64 @@ export default function NovelEditor({ chapterPlotId }: NovelEditorProps) {
         </div>
       </div>
 
+      {/* ── Chapter summary panel ── */}
+      {showChapterSummary && currentEpisode?.chapter_summary && (
+        <div className="flex-shrink-0 border-t border-indigo-100 bg-indigo-50 px-4 py-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-indigo-600">AI 챕터 요약</span>
+            <button
+              onClick={() => setShowChapterSummary(false)}
+              className="text-indigo-300 hover:text-indigo-500 text-xs px-1"
+            >✕</button>
+          </div>
+          <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+            {currentEpisode.chapter_summary}
+          </p>
+        </div>
+      )}
+
       {/* ── Status bar ── */}
       {editor && (
-        <div className="h-8 flex items-center justify-end gap-3 px-4 bg-white border-t border-gray-200 flex-shrink-0">
-          <span className="text-[11px] text-gray-400">
-            {(editor as any).storage.characterCount?.characters?.() ?? 0} 자
-          </span>
-          <span className="text-[11px] text-gray-300">·</span>
-          <span className="text-[11px] text-gray-400">
-            {(editor as any).storage.characterCount?.words?.() ?? 0} 단어
-          </span>
+        <div className="h-8 flex items-center justify-between px-4 bg-white border-t border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            {currentEpisode?.chapter_summary && (
+              <button
+                onClick={() => setShowChapterSummary((v) => !v)}
+                className="text-[11px] text-indigo-400 hover:text-indigo-600"
+              >
+                {showChapterSummary ? '▼ 요약 닫기' : '▲ AI 요약 보기'}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                if (!selectedEpisodeId) return;
+                setChapterSummaryLoading(true);
+                try {
+                  const res = await summarizeChapter(selectedEpisodeId);
+                  setEpisodeChapterSummary(selectedEpisodeId, res.summary);
+                  setShowChapterSummary(true);
+                } catch {
+                  alert('챕터 요약 생성에 실패했습니다. 백엔드가 실행 중인지 확인하세요.');
+                } finally {
+                  setChapterSummaryLoading(false);
+                }
+              }}
+              disabled={chapterSummaryLoading}
+              className="text-[11px] text-indigo-500 hover:text-indigo-700 disabled:text-gray-300 border border-indigo-200 hover:border-indigo-400 rounded px-2 py-0.5 transition-colors"
+            >
+              {chapterSummaryLoading ? '요약 중...' : 'AI로 이 챕터 내용 요약하기'}
+            </button>
+            <span className="text-[11px] text-gray-300">|</span>
+            <span className="text-[11px] text-gray-400">
+              {(editor as any).storage.characterCount?.characters?.() ?? 0} 자
+            </span>
+            <span className="text-[11px] text-gray-300">·</span>
+            <span className="text-[11px] text-gray-400">
+              {(editor as any).storage.characterCount?.words?.() ?? 0} 단어
+            </span>
+          </div>
         </div>
       )}
     </div>

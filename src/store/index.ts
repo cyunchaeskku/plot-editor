@@ -97,6 +97,7 @@ interface AppState {
 
   createEpisode: (workId: number, title: string) => Promise<void>;
   updateEpisode: (id: number, title: string) => void;
+  setEpisodeChapterSummary: (id: number, summary: string) => void;
   deleteEpisode: (id: number) => void;
   reorderEpisodes: (workId: number, reordered: Episode[]) => void;
 
@@ -436,6 +437,20 @@ export const useStore = create<AppState>((set, get) => ({
         },
         isDirty: true,
       };
+    });
+  },
+
+  setEpisodeChapterSummary: (id, summary) => {
+    set((s) => {
+      const newEpisodes = { ...s.episodes };
+      for (const [wId, eps] of Object.entries(s.episodes)) {
+        const idx = eps.findIndex((e) => e.id === id);
+        if (idx !== -1) {
+          newEpisodes[Number(wId)] = eps.map((e, i) => (i === idx ? { ...e, chapter_summary: summary } : e));
+          break;
+        }
+      }
+      return { episodes: newEpisodes };
     });
   },
 

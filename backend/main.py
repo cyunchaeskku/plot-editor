@@ -318,12 +318,76 @@ async def create_episode(work_id: int, request: Request):
 async def update_episode(episode_id: int, request: Request):
     sub = _require_login(request)
     body = await request.json()
+    update_expr = "SET title = :t, order_index = :o"
+    expr_values = {":t": body.get("title", ""), ":o": body.get("order_index", 0)}
+    if "chapter_summary" in body:
+        update_expr += ", chapter_summary = :cs"
+        expr_values[":cs"] = body["chapter_summary"]
     _episodes_table.update_item(
         Key={"episode_id": f"{sub}#{episode_id}"},
-        UpdateExpression="SET title = :t, order_index = :o",
-        ExpressionAttributeValues={":t": body.get("title", ""), ":o": body.get("order_index", 0)},
+        UpdateExpression=update_expr,
+        ExpressionAttributeValues=expr_values,
     )
     return {"ok": True}
+
+
+@app.post("/episodes/{episode_id}/summarize")
+async def summarize_chapter(episode_id: int, request: Request):
+    sub = _require_login(request)
+
+    # Get episode info
+    ep_item = _episodes_table.get_item(
+        Key={"episode_id": f"{sub}#{episode_id}"}
+    ).get("Item")
+    if not ep_item:
+        raise HTTPException(status_code=404, detail="챕터를 찾을 수 없습니다.")
+
+    # Find the plot for this episode
+    plots_res = _plots_table.scan(
+        FilterExpression="user_sub = :s AND episode_id = :e",
+        ExpressionAttributeValues={":s": sub, ":e": episode_id},
+    )
+    plots = plots_res.get("Items", [])
+    if not plots:
+        raise HTTPException(status_code=404, detail="챕터 내용이 없습니다.")
+
+    # Collect all text from S3
+    chapter_text = ""
+    for plot in plots:
+        s3_key = f"plots/{sub}/{int(plot['local_id'])}.json"
+        try:
+            obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
+            content = json.loads(obj["Body"].read())
+            chapter_text += _extract_plain_text(content.get("content", []))
+        except Exception:
+            logger.warning("Chapter text extraction failed for plot %s", plot.get("local_id"))
+
+    if not chapter_text.strip():
+        raise HTTPException(status_code=400, detail="챕터에 내용이 없습니다.")
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
+
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+    messages = [
+        SystemMessage(content="주어진 소설 챕터 내용을 읽고, 이 챕터에서 벌어진 주요 사건을 4~5줄로 간결하게 요약하세요."),
+        HumanMessage(content=chapter_text.strip()),
+    ]
+    response = await llm.ainvoke(messages)
+    summary = response.content
+
+    # Save to DynamoDB
+    _episodes_table.update_item(
+        Key={"episode_id": f"{sub}#{episode_id}"},
+        UpdateExpression="SET chapter_summary = :cs",
+        ExpressionAttributeValues={":cs": summary},
+    )
+
+    return {"summary": summary}
 
 
 @app.delete("/episodes/{episode_id}")
