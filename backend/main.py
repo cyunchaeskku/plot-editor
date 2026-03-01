@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -8,10 +9,11 @@ _lambda_pkg = os.path.join(os.path.dirname(__file__), "lambda_package")
 if os.path.isdir(_lambda_pkg) and _lambda_pkg not in sys.path:
     sys.path.insert(0, _lambda_pkg)
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import boto3
+import jwt as pyjwt
 from authlib.integrations.starlette_client import OAuth
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
@@ -37,12 +39,42 @@ def _require_env(key: str) -> str:
     return val
 
 
+_JWT_SECRET = _require_env("SECRET_KEY")
+_JWT_ALGORITHM = "HS256"
+_JWT_EXPIRE_DAYS = 30
+
+
 def _require_login(request: Request) -> str:
-    """로그인된 사용자의 sub 반환, 미로그인 시 401"""
-    user = request.session.get("user")
-    if not user:
+    """JWT Bearer 토큰에서 sub 반환, 없거나 만료 시 401"""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    return user["sub"]
+    token = auth[7:]
+    try:
+        payload = pyjwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="토큰이 만료되었습니다.")
+    except pyjwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+    return payload["sub"]
+
+
+def _extract_dialogues(nodes: list, target_name: str) -> list[str]:
+    """Recursively walk TipTap JSON nodes and collect dialogue text for target_name."""
+    result = []
+    for node in nodes:
+        if node.get("type") == "dialogue" and node.get("attrs", {}).get("characterName") == target_name:
+            texts = []
+            for child in node.get("content") or []:
+                for inline in child.get("content") or []:
+                    if inline.get("type") == "text":
+                        texts.append(inline.get("text", ""))
+            text = "".join(texts).strip()
+            if text:
+                result.append(text)
+        elif node.get("content"):
+            result.extend(_extract_dialogues(node["content"], target_name))
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +183,6 @@ async def authorize(request: Request) -> RedirectResponse:
     userinfo = token.get("userinfo")
     if not userinfo:
         raise HTTPException(status_code=400, detail="Cognito에서 유저 정보를 받지 못했습니다.")
-    request.session["user"] = dict(userinfo)
-
     # 신규 사용자이면 DynamoDB에 등록 (기존 사용자는 무시)
     try:
         _users_table.put_item(
@@ -168,16 +198,28 @@ async def authorize(request: Request) -> RedirectResponse:
         if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
             raise  # 기존 사용자면 조용히 무시, 다른 에러는 전파
 
+    # JWT 발급 (30일 만료)
+    jwt_payload = {
+        "sub": userinfo["sub"],
+        "email": userinfo.get("email", ""),
+        "exp": datetime.now(timezone.utc) + timedelta(days=_JWT_EXPIRE_DAYS),
+    }
+    jwt_token = pyjwt.encode(jwt_payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+
     frontend_url = os.getenv("FRONTEND_URL", "/")
-    return RedirectResponse(url=frontend_url)
+    return RedirectResponse(url=f"{frontend_url}#token={jwt_token}")
 
 
 @app.get("/me")
 async def me(request: Request):
-    user = request.session.get("user")
-    if not user:
-        raise HTTPException(status_code=401, detail="로그인되지 않았습니다.")
-    return {"sub": user.get("sub"), "email": user.get("email", "")}
+    sub = _require_login(request)
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:]
+    try:
+        payload = pyjwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except pyjwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+    return {"sub": sub, "email": payload.get("email", "")}
 
 
 # ── Works ──────────────────────────────────────────────────────────────────
@@ -400,11 +442,12 @@ async def update_character(character_id: int, request: Request):
     body = await request.json()
     _characters_table.update_item(
         Key={"character_id": f"{sub}#{character_id}"},
-        UpdateExpression="SET #n = :n, color = :c, properties = :p, memo = :m",
+        UpdateExpression="SET #n = :n, color = :c, properties = :p, memo = :m, ai_summary = :a",
         ExpressionAttributeNames={"#n": "name"},
         ExpressionAttributeValues={
             ":n": body.get("name", ""), ":c": body.get("color", ""),
             ":p": body.get("properties", "{}"), ":m": body.get("memo", ""),
+            ":a": body.get("ai_summary", ""),
         },
     )
     return {"ok": True}
@@ -415,6 +458,152 @@ async def delete_character(character_id: int, request: Request):
     sub = _require_login(request)
     _characters_table.delete_item(Key={"character_id": f"{sub}#{character_id}"})
     return {"ok": True}
+
+
+@app.get("/characters/{character_id}/dialogues")
+async def get_character_dialogues(character_id: int, request: Request):
+    sub = _require_login(request)
+    char_item = _characters_table.get_item(
+        Key={"character_id": f"{sub}#{character_id}"}
+    ).get("Item")
+    if not char_item:
+        raise HTTPException(status_code=404, detail="인물을 찾을 수 없습니다.")
+
+    work_id = int(char_item["work_id"])
+    char_name = char_item["name"]
+
+    eps_res = _episodes_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    episodes = eps_res.get("Items", [])
+
+    dialogues = []
+    for ep in episodes:
+        ep_local_id = int(ep["local_id"])
+        ep_title = ep.get("title", "")
+
+        plots_res = _plots_table.scan(
+            FilterExpression="user_sub = :s AND episode_id = :e",
+            ExpressionAttributeValues={":s": sub, ":e": ep_local_id},
+        )
+        for plot in plots_res.get("Items", []):
+            plot_local_id = int(plot["local_id"])
+            plot_title = plot.get("title", "")
+            s3_key = f"plots/{sub}/{plot_local_id}.json"
+            try:
+                obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
+                content = json.loads(obj["Body"].read())
+                found = _extract_dialogues(content.get("content", []), char_name)
+                for text in found:
+                    dialogues.append({
+                        "episode_title": ep_title,
+                        "plot_title": plot_title,
+                        "plot_id": plot_local_id,
+                        "dialogue_text": text,
+                    })
+            except Exception:
+                logger.warning("Dialogue extraction failed for plot %s:\n%s", plot_local_id, traceback.format_exc())
+
+    return dialogues
+
+
+@app.post("/characters/{character_id}/summarize")
+async def summarize_character(character_id: int, request: Request):
+    sub = _require_login(request)
+    char_item = _characters_table.get_item(
+        Key={"character_id": f"{sub}#{character_id}"}
+    ).get("Item")
+    if not char_item:
+        raise HTTPException(status_code=404, detail="인물을 찾을 수 없습니다.")
+
+    work_id = int(char_item["work_id"])
+    char_name = char_item["name"]
+    char_properties = char_item.get("properties", "{}")
+    char_memo = char_item.get("memo", "")
+
+    # Collect all dialogues
+    eps_res = _episodes_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    all_dialogues = []
+    for ep in eps_res.get("Items", []):
+        ep_local_id = int(ep["local_id"])
+        plots_res = _plots_table.scan(
+            FilterExpression="user_sub = :s AND episode_id = :e",
+            ExpressionAttributeValues={":s": sub, ":e": ep_local_id},
+        )
+        for plot in plots_res.get("Items", []):
+            s3_key = f"plots/{sub}/{int(plot['local_id'])}.json"
+            try:
+                obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
+                content = json.loads(obj["Body"].read())
+                all_dialogues.extend(_extract_dialogues(content.get("content", []), char_name))
+            except Exception:
+                pass
+
+    # Collect relations for this character
+    rels_res = _relations_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    # Build character name map
+    chars_res = _characters_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    char_name_map = {int(c["local_id"]): c.get("name", "") for c in chars_res.get("Items", [])}
+
+    char_rels = [
+        r for r in rels_res.get("Items", [])
+        if int(r.get("from_character_id", -1)) == character_id
+        or int(r.get("to_character_id", -1)) == character_id
+    ]
+
+    # Build context string
+    context_parts = [f"인물 이름: {char_name}"]
+    try:
+        props = json.loads(char_properties)
+        if props:
+            props_str = ", ".join(f"{k}: {v}" for k, v in props.items())
+            context_parts.append(f"특성: {props_str}")
+    except Exception:
+        pass
+
+    if char_memo:
+        context_parts.append(f"메모: {char_memo}")
+
+    if char_rels:
+        rel_lines = []
+        for r in char_rels:
+            from_id = int(r.get("from_character_id", -1))
+            to_id = int(r.get("to_character_id", -1))
+            from_name = char_name_map.get(from_id, str(from_id))
+            to_name = char_name_map.get(to_id, str(to_id))
+            rel_lines.append(f"{from_name} → {r.get('relation_name', '')} → {to_name}")
+        context_parts.append("관계:\n" + "\n".join(rel_lines))
+
+    if all_dialogues:
+        dialogue_lines = "\n".join(f"- {d}" for d in all_dialogues)
+        context_parts.append(f"대사:\n{dialogue_lines}")
+
+    context = "\n\n".join(context_parts)
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
+
+    from langchain_openai import ChatOpenAI
+    from langchain.schema import SystemMessage, HumanMessage
+
+    llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+    messages = [
+        SystemMessage(content="주어진 내용을 바탕으로 이 인물의 성격, 타 인물과의 관계, 그리고 지금까지의 행보를 간단히 요약하세요."),
+        HumanMessage(content=context),
+    ]
+    response = await llm.ainvoke(messages)
+    return {"summary": response.content}
 
 
 # ── Character Relations ────────────────────────────────────────────────────
@@ -476,8 +665,7 @@ async def save_graph_layout(work_id: int, request: Request):
 
 @app.get("/logout")
 async def logout(request: Request) -> RedirectResponse:
-    request.session.pop("user", None)
-
+    # JWT는 stateless — 토큰 삭제는 프론트엔드에서 처리
     cognito_domain = os.getenv("COGNITO_DOMAIN")
     client_id = os.getenv("COGNITO_CLIENT_ID")
     logout_uri = os.getenv("LOGOUT_URI", os.getenv("FRONTEND_URL", "/"))

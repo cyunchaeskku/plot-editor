@@ -7,3 +7,7 @@ itsdangerous==2.2.0
 python-dotenv==1.0.1
 boto3==1.35.0
 mangum
+PyJWT==2.9.0
+langchain
+langchain-openai
+openai

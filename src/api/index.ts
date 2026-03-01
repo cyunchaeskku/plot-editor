@@ -2,6 +2,11 @@ import type { Work, Episode, Plot, Character, CharacterRelation, WorkType } from
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string) ?? '';
 
+const TOKEN_KEY = 'plot_editor_token';
+export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
+export function setToken(token: string) { localStorage.setItem(TOKEN_KEY, token); }
+export function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
 async function apiFetch(method: string, path: string, body?: unknown): Promise<any> {
   const headers: Record<string, string> = {};
   let bodyStr: string | undefined;
@@ -9,9 +14,10 @@ async function apiFetch(method: string, path: string, body?: unknown): Promise<a
     headers['Content-Type'] = 'application/json';
     bodyStr = JSON.stringify(body);
   }
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
-    credentials: 'include',
     headers,
     body: bodyStr,
   });
@@ -65,6 +71,7 @@ function normalizeCharacter(item: any): Character {
     properties: item.properties || '{}',
     memo: item.memo || '',
     image: item.image || '',
+    ai_summary: item.ai_summary || '',
   };
 }
 
@@ -158,7 +165,9 @@ export async function fetchPlots(episodeId: number): Promise<Plot[]> {
 
 export async function fetchPlotContent(plotId: number): Promise<string> {
   try {
-    const res = await fetch(`${BASE}/plots/${plotId}/content`, { credentials: 'include' });
+    const token = getToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${BASE}/plots/${plotId}/content`, { headers });
     if (!res.ok) return '{}';
     return (await res.text()) || '{}';
   } catch {
@@ -188,10 +197,12 @@ export async function apiUpdatePlotMeta(
 }
 
 export async function apiSavePlotContent(id: number, content: string): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${BASE}/plots/${id}/content`, {
     method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: content,
   });
   if (!res.ok) throw new Error(`PUT /plots/${id}/content → ${res.status}`);
@@ -233,8 +244,24 @@ export async function apiUpdateCharacter(
   color: string,
   properties: string,
   memo: string,
+  aiSummary = '',
 ): Promise<void> {
-  await apiFetch('PUT', `/characters/${id}`, { name, color, properties, memo });
+  await apiFetch('PUT', `/characters/${id}`, { name, color, properties, memo, ai_summary: aiSummary });
+}
+
+export interface CharacterDialogue {
+  episode_title: string;
+  plot_title: string;
+  plot_id: number;
+  dialogue_text: string;
+}
+
+export async function fetchCharacterDialogues(characterId: number): Promise<CharacterDialogue[]> {
+  return apiFetch('GET', `/characters/${characterId}/dialogues`);
+}
+
+export async function generateCharacterSummary(characterId: number): Promise<{ summary: string }> {
+  return apiFetch('POST', `/characters/${characterId}/summarize`);
 }
 
 export async function apiDeleteCharacter(id: number): Promise<void> {

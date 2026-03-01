@@ -17,6 +17,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useStore } from '../../store';
+import { getToken } from '../../api';
 
 // Floating edge: draws a straight line between the two closest circle-border points
 function FloatingEdge({ id, source, target, markerEnd, style, label, labelStyle, labelBgStyle, data }: EdgeProps) {
@@ -224,7 +225,9 @@ export default function GraphView() {
   // GraphView 진입 시 저장된 노드 위치 불러오기
   useEffect(() => {
     if (!selectedWorkId) return;
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/graph-layout/${selectedWorkId}`, { credentials: 'include' })
+    const token = getToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/graph-layout/${selectedWorkId}`, { headers })
       .then((r) => (r.ok ? r.json() : {}))
       .then((positions: Record<string, { x: number; y: number }>) => {
         nodePositions.current = positions;
@@ -240,10 +243,12 @@ export default function GraphView() {
       if (layoutSaveTimeout.current) clearTimeout(layoutSaveTimeout.current);
       layoutSaveTimeout.current = setTimeout(() => {
         if (!selectedWorkId) return;
+        const token = getToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         fetch(`${import.meta.env.VITE_API_BASE_URL}/graph-layout/${selectedWorkId}`, {
           method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(nodePositions.current),
         }).catch(() => {});
       }, 1000);

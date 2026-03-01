@@ -12,6 +12,7 @@ import ChapterList from './components/NovelEditor/ChapterList';
 import ContinuousNovelEditor from './components/NovelEditor/ContinuousNovelEditor';
 import ContinuousPlotEditor from './components/Editor/ContinuousPlotEditor';
 import { useStore } from './store';
+import { setToken } from './api';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -35,8 +36,13 @@ export default function App() {
     saveAll,
   } = useStore();
 
-  // On mount: load user info and works from API
+  // On mount: extract JWT token from URL hash (after OAuth callback), then load user info
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#token=')) {
+      setToken(hash.slice(7));
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     loadUserInfo();
     loadWorks();
   }, []);

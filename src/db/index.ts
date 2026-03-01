@@ -32,6 +32,7 @@ export interface Character {
   properties: string;
   memo: string;
   image?: string;
+  ai_summary?: string;
 }
 
 export interface CharacterRelation {

@@ -116,6 +116,7 @@ interface AppState {
     properties: string,
     memo?: string,
     image?: string,
+    aiSummary?: string,
   ) => void;
   deleteCharacter: (id: number) => void;
   createRelation: (fromId: number, toId: number, name: string) => void;
@@ -639,7 +640,7 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
-  updateCharacter: (id, name, color, properties, memo = '', image = '') => {
+  updateCharacter: (id, name, color, properties, memo = '', image = '', aiSummary = '') => {
     const { selectedWorkId, episodes, plots: plotsMap } = get();
 
     // Find old char for dialogue sync
@@ -692,7 +693,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...(selectedWorkId
           ? {
               [selectedWorkId]: (s.characters[selectedWorkId] || []).map((c) =>
-                c.id === id ? { ...c, name, color, properties, memo, image } : c,
+                c.id === id ? { ...c, name, color, properties, memo, image, ai_summary: aiSummary } : c,
               ),
             }
           : {}),
@@ -926,7 +927,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...charsToUpdate.map((id) => {
           const ch = findCharacter(characters, id);
           return ch
-            ? api.apiUpdateCharacter(ch.id, ch.name, ch.color, ch.properties, ch.memo)
+            ? api.apiUpdateCharacter(ch.id, ch.name, ch.color, ch.properties, ch.memo, ch.ai_summary)
             : Promise.resolve();
         }),
       ]);

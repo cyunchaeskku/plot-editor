@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import sidebarCollapseIcon from '../../assets/sidebar_collapse_icon.svg';
 import { useStore } from '../../store';
+import { clearToken } from '../../api';
 import type { WorkType } from '../../db';
 
 const PRESET_COLORS = [
@@ -449,6 +450,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
               <button
                 onClick={() => {
                   if (isDirty && !window.confirm('저장되지 않은 변경사항이 있습니다. 로그아웃하면 사라집니다. 계속하시겠습니까?')) return;
+                  clearToken();
                   window.location.href = `${import.meta.env.VITE_API_BASE_URL}/logout`;
                 }}
                 className="text-xs text-gray-600 hover:text-red-400 flex-shrink-0 transition-colors"

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../../store';
+import { fetchCharacterDialogues, generateCharacterSummary } from '../../api';
+import type { CharacterDialogue } from '../../api';
 
 const PRESET_COLORS = [
   '#6366f1', '#ec4899', '#f59e0b', '#10b981',
@@ -35,12 +37,18 @@ export default function CharacterDetail() {
   const [isDirty, setIsDirty] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [dialogues, setDialogues] = useState<CharacterDialogue[]>([]);
+  const [dialoguesLoading, setDialoguesLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
   useEffect(() => {
     if (!char) return;
     setName(char.name);
     setColor(char.color);
     setMemo(char.memo || '');
     setImage(char.image || '');
+    setAiSummary(char.ai_summary || '');
     try {
       const parsed = JSON.parse(char.properties);
       setProperties(Object.entries(parsed).map(([key, value]) => ({ key, value: value as string })));
@@ -48,6 +56,16 @@ export default function CharacterDetail() {
       setProperties([]);
     }
     setIsDirty(false);
+  }, [char?.id]);
+
+  useEffect(() => {
+    if (!char) return;
+    setDialogues([]);
+    setDialoguesLoading(true);
+    fetchCharacterDialogues(char.id)
+      .then(setDialogues)
+      .catch(() => setDialogues([]))
+      .finally(() => setDialoguesLoading(false));
   }, [char?.id]);
 
   if (!char) {
@@ -66,8 +84,21 @@ export default function CharacterDetail() {
 
   const handleSave = async () => {
     const propsObj = Object.fromEntries(properties.filter((p) => p.key).map((p) => [p.key, p.value]));
-    await updateCharacter(char.id, name, color, JSON.stringify(propsObj), memo, image);
+    await updateCharacter(char.id, name, color, JSON.stringify(propsObj), memo, image, aiSummary);
     setIsDirty(false);
+  };
+
+  const handleGenerateSummary = async () => {
+    setAiSummaryLoading(true);
+    try {
+      const res = await generateCharacterSummary(char.id);
+      setAiSummary(res.summary);
+      setIsDirty(true);
+    } catch (err) {
+      alert('AI 요약 생성에 실패했습니다. 백엔드가 실행 중인지 확인하세요.');
+    } finally {
+      setAiSummaryLoading(false);
+    }
   };
 
   const addProperty = () => {
@@ -110,7 +141,7 @@ export default function CharacterDetail() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto">
       <input
         ref={fileInputRef}
         type="file"
@@ -124,7 +155,7 @@ export default function CharacterDetail() {
         <span className="text-sm font-semibold text-gray-800">{char.name}</span>
       </div>
 
-      <div className="flex-1 p-4 space-y-4">
+      <div className="p-4 space-y-4">
         {/* Name */}
         <div>
           <label className="text-xs text-gray-500 mb-1 block">이름</label>
@@ -321,6 +352,48 @@ export default function CharacterDetail() {
               >추가</button>
             </div>
           </div>
+        </div>
+
+        {/* Dialogues */}
+        <div>
+          <label className="text-xs text-gray-500 mb-2 block">대사</label>
+          {dialoguesLoading ? (
+            <p className="text-xs text-gray-400">불러오는 중...</p>
+          ) : dialogues.length === 0 ? (
+            <p className="text-xs text-gray-400">아직 대사가 없습니다</p>
+          ) : (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {dialogues.map((d, idx) => (
+                <div key={idx} className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+                  <p className="text-[10px] text-gray-400 mb-0.5">
+                    {d.episode_title} &gt; {d.plot_title}
+                  </p>
+                  <p className="text-xs text-gray-700">{d.dialogue_text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* AI Summary */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs text-gray-500">AI 인물 요약</label>
+            <button
+              onClick={handleGenerateSummary}
+              disabled={aiSummaryLoading}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-2 py-1 rounded transition-colors"
+            >
+              {aiSummaryLoading ? '생성 중...' : '요약 생성'}
+            </button>
+          </div>
+          <textarea
+            value={aiSummary}
+            onChange={(e) => { setAiSummary(e.target.value); setIsDirty(true); }}
+            placeholder="'요약 생성' 버튼을 눌러 AI가 인물을 분석하게 하세요"
+            rows={5}
+            className="w-full bg-white text-gray-700 rounded px-2 py-1.5 text-xs outline-none border border-gray-200 resize-none"
+          />
         </div>
       </div>
     </div>
