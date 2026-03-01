@@ -7,6 +7,7 @@ export interface Work {
   type: WorkType;
   created_at: string;
   planning_doc?: string;
+  work_summary?: string;
 }
 
 export interface Episode {

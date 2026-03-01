@@ -77,7 +77,7 @@ interface AppState {
   // UI state
   expandedWorkIds: Set<number>;
   expandedEpisodeIds: Set<number>;
-  rightPanelMode: 'editor' | 'character' | 'graph' | 'planning';
+  rightPanelMode: 'editor' | 'character' | 'graph' | 'planning' | 'work-info';
 
   // Planning doc
   planningDoc: string;
@@ -132,7 +132,8 @@ interface AppState {
   selectCharacter: (id: number | null) => void;
   toggleWorkExpand: (id: number) => void;
   toggleEpisodeExpand: (id: number) => void;
-  setRightPanelMode: (mode: 'editor' | 'character' | 'graph' | 'planning') => void;
+  setRightPanelMode: (mode: 'editor' | 'character' | 'graph' | 'planning' | 'work-info') => void;
+  setWorkSummary: (workId: number, summary: string) => void;
 }
 
 // ── Helper: find a plot across all episode buckets ────────────────────────────
@@ -1059,4 +1060,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
+
+  setWorkSummary: (workId, summary) => {
+    set((s) => ({
+      works: s.works.map((w) => (w.id === workId ? { ...w, work_summary: summary } : w)),
+    }));
+  },
 }));

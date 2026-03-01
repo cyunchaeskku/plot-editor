@@ -40,6 +40,7 @@ function normalizeWork(item: any): Work {
     type: (item.type as WorkType) || 'plot',
     created_at: item.created_at || '',
     planning_doc: item.planning_doc || '',
+    work_summary: item.work_summary || '',
   };
 }
 
@@ -119,6 +120,10 @@ export async function apiUpdateWork(
 
 export async function apiDeleteWork(id: number): Promise<void> {
   await apiFetch('DELETE', `/works/${id}`);
+}
+
+export async function summarizeWork(workId: number, existingSummary = ''): Promise<{ summary: string }> {
+  return apiFetch('POST', `/works/${workId}/summarize`, { existing_summary: existingSummary });
 }
 
 // ── Episodes ──────────────────────────────────────────────────────────────────

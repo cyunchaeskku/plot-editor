@@ -265,17 +265,83 @@ async def create_work(request: Request):
 async def update_work(work_id: int, request: Request):
     sub = _require_login(request)
     body = await request.json()
+    update_expr = "SET title = :t, #tp = :tp, planning_doc = :pd"
+    expr_values = {
+        ":t": body.get("title", ""),
+        ":tp": body.get("type", "plot"),
+        ":pd": body.get("planning_doc", ""),
+    }
+    if "work_summary" in body:
+        update_expr += ", work_summary = :ws"
+        expr_values[":ws"] = body["work_summary"]
     _works_table.update_item(
         Key={"work_id": f"{sub}#{work_id}"},
-        UpdateExpression="SET title = :t, #tp = :tp, planning_doc = :pd",
+        UpdateExpression=update_expr,
         ExpressionAttributeNames={"#tp": "type"},
-        ExpressionAttributeValues={
-            ":t": body.get("title", ""),
-            ":tp": body.get("type", "plot"),
-            ":pd": body.get("planning_doc", ""),
-        },
+        ExpressionAttributeValues=expr_values,
     )
     return {"ok": True}
+
+
+@app.post("/works/{work_id}/summarize")
+async def summarize_work(work_id: int, request: Request):
+    sub = _require_login(request)
+
+    # Collect chapter_summary from all episodes of this work
+    eps_res = _episodes_table.scan(
+        FilterExpression="user_sub = :s AND work_id = :w",
+        ExpressionAttributeValues={":s": sub, ":w": work_id},
+    )
+    episodes = sorted(eps_res.get("Items", []), key=lambda x: x.get("order_index", 0))
+
+    chapter_summaries = []
+    for ep in episodes:
+        summary = ep.get("chapter_summary", "").strip()
+        if summary:
+            chapter_summaries.append(f"[{ep.get('title', '챕터')}]\n{summary}")
+
+    if not chapter_summaries:
+        raise HTTPException(status_code=400, detail="챕터 요약이 없습니다. 먼저 각 챕터를 AI로 요약해주세요.")
+
+    context = "\n\n".join(chapter_summaries)
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 가 설정되지 않았습니다.")
+
+    try:
+        req_body = await request.json()
+    except Exception:
+        req_body = {}
+    existing_summary = (req_body.get("existing_summary") or "").strip()
+
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key)
+
+    if existing_summary:
+        system_prompt = "주어진 각 챕터 요약을 바탕으로 작품 전체 내용을 다시 요약하세요. 기존 요약의 흐름을 최대한 유지하되, 새로운 챕터 정보가 있으면 자연스럽게 반영하세요."
+        user_content = f"[기존 요약]\n{existing_summary}\n\n[챕터별 요약]\n{context}"
+    else:
+        system_prompt = "주어진 각 챕터 요약을 읽고, 이 작품 전체의 줄거리와 핵심 흐름을 간결하게 요약하세요."
+        user_content = context
+
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_content),
+    ]
+    response = await llm.ainvoke(messages)
+    summary = response.content
+
+    # Save to DynamoDB
+    _works_table.update_item(
+        Key={"work_id": f"{sub}#{work_id}"},
+        UpdateExpression="SET work_summary = :ws",
+        ExpressionAttributeValues={":ws": summary},
+    )
+
+    return {"summary": summary}
 
 
 @app.delete("/works/{work_id}")

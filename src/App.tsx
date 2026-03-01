@@ -6,6 +6,7 @@ import Editor from './components/Editor';
 import CharacterDetail from './components/CharacterDetail';
 import GraphView from './components/GraphView';
 import PlanningDoc from './components/PlanningDoc';
+import WorkInfo from './components/WorkInfo';
 import ExportButton from './components/Export';
 import NovelEditor from './components/NovelEditor';
 import ChapterList from './components/NovelEditor/ChapterList';
@@ -221,6 +222,14 @@ export default function App() {
           >
             📝 기획서
           </button>
+          <button
+            onClick={() => setRightPanelMode('work-info')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              rightPanelMode === 'work-info' ? 'bg-[#AD1B02] text-white' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📚 작품 정보
+          </button>
           <div className="flex-1" />
           {/* Save button — only shown when logged in and a work is selected */}
           {selectedWorkId && isLoggedIn && (
@@ -270,6 +279,7 @@ export default function App() {
           {rightPanelMode === 'character' && <CharacterDetail />}
           {rightPanelMode === 'graph' && <GraphView />}
           {rightPanelMode === 'planning' && <PlanningDoc />}
+          {rightPanelMode === 'work-info' && <WorkInfo />}
         </div>
       </div>
     </div>
