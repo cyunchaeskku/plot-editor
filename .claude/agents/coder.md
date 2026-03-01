@@ -1,7 +1,7 @@
 ---
 name: coder
 type: developer
-color: "#FF6B35"
+color: red
 model: sonnet
 description: Implementation specialist for writing clean, efficient code
 capabilities:

@@ -1,7 +1,7 @@
 ---
 name: reviewer
 type: validator
-color: red
+color: blue
 model: sonnet
 description: Code review and quality assurance specialist
 capabilities:

@@ -9,10 +9,9 @@ interface PostCardProps {
 }
 
 function Avatar({ name, color }: { name: string; color: string }) {
-  const initials = name.charAt(0);
   return (
     <div className="post-avatar" style={{ backgroundColor: color }}>
-      {initials}
+      {name.charAt(0)}
     </div>
   );
 }
@@ -35,28 +34,35 @@ export default function PostCard({ post, selected, onClick, onExpand }: PostCard
         </div>
       </div>
 
-      {/* Content preview */}
-      <div className="scene-preview mt-2">
-        <div className="scene-preview__heading">
-          {post.content_preview.scene_heading}
+      {/* Content preview — branched by work_type */}
+      {post.work_type === 'plot' ? (
+        <div className="scene-preview mt-2">
+          <div className="scene-preview__heading">
+            {post.content_preview.scene_heading}
+          </div>
+          <div className="scene-preview__meta">
+            <span>📍 {post.content_preview.scene_location}</span>
+            <span>⏱ {post.content_preview.scene_time}</span>
+          </div>
+          <div className="scene-preview__dialogues">
+            {post.content_preview.dialogues.slice(0, 2).map((d, i) => (
+              <div
+                key={i}
+                className="dialogue-preview"
+                style={{ borderLeftColor: d.character_color }}
+              >
+                <span className="dialogue-preview__name">{d.character_name}</span>
+                <span className="dialogue-preview__text">{d.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="scene-preview__meta">
-          <span>📍 {post.content_preview.scene_location}</span>
-          <span>⏱ {post.content_preview.scene_time}</span>
+      ) : (
+        <div className="novel-preview mt-2">
+          <div className="novel-preview__chapter">{post.content_preview.chapter_title}</div>
+          <div className="novel-preview__excerpt">{post.content_preview.excerpt}</div>
         </div>
-        <div className="scene-preview__dialogues">
-          {post.content_preview.dialogues.slice(0, 2).map((d, i) => (
-            <div
-              key={i}
-              className="dialogue-preview"
-              style={{ borderLeftColor: d.character_color }}
-            >
-              <span className="dialogue-preview__name">{d.character_name}</span>
-              <span className="dialogue-preview__text">{d.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1 mt-2">

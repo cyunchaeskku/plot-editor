@@ -317,6 +317,113 @@ input, textarea, button, select {
   white-space: nowrap;
 }
 
+/* Novel preview block (inside post card / detail) */
+.novel-preview {
+  background: #f5f7fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+}
+.novel-preview__chapter {
+  font-weight: 700;
+  font-size: 11px;
+  color: #4a7c99;
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.03em;
+}
+.novel-preview__excerpt {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Reader mode ────────────────────────────────────────────────── */
+
+/* Plot reader */
+.reader-scene {
+  margin-bottom: 2rem;
+}
+.reader-scene__heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #E88D14;
+  font-size: 12px;
+  background: rgba(232, 141, 20, 0.1);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  display: inline-block;
+  margin-bottom: 0.3rem;
+}
+.reader-scene__meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 0.75rem;
+}
+.reader-scene__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.reader-dialogue {
+  border-left: 3px solid;
+  padding: 0.3rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.reader-dialogue__name {
+  font-weight: 700;
+  font-size: 10px;
+  color: #1a0a06;
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.reader-dialogue__text {
+  font-size: 13px;
+  color: #1a0a06;
+  line-height: 1.6;
+}
+.reader-narration {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+  padding: 0.25rem 1rem;
+  line-height: 1.6;
+}
+.reader-stage-direction {
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+  padding-left: 1.5rem;
+  line-height: 1.55;
+}
+
+/* Novel reader */
+.reader-novel__chapter {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a0a06;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.reader-novel__paragraph {
+  font-size: 13px;
+  color: #1a0a06;
+  line-height: 1.85;
+  margin-bottom: 1rem;
+  text-indent: 1em;
+}
+
 /* Thread tab */
 .thread-tab {
   padding: 0.3rem 0.75rem 0.5rem;
