@@ -160,8 +160,8 @@ _plots_table      = _dynamodb.Table("plots")
 _characters_table = _dynamodb.Table("characters")
 _relations_table  = _dynamodb.Table("character_relations")
 _graph_table      = _dynamodb.Table("graph_layouts")
-_posts_table      = _dynamodb.Table("community_posts")
-_comments_table   = _dynamodb.Table("community_comments")
+_posts_table      = _dynamodb.Table("posts")
+_comments_table   = _dynamodb.Table("comments")
 
 _s3 = boto3.client("s3", region_name=_region)
 _S3_BUCKET = os.getenv("S3_BUCKET", "")
@@ -1022,6 +1022,36 @@ async def delete_post(post_id: int, request: Request):
     return {"ok": True}
 
 
+@app.post("/posts/{post_id}/like")
+async def toggle_post_like(post_id: str, request: Request):
+    """Toggle like on a post. Returns {liked, like_count}."""
+    sub = _require_login(request)
+    res = _posts_table.scan(
+        FilterExpression="local_id = :lid",
+        ExpressionAttributeValues={":lid": str(post_id)},
+    )
+    items = res.get("Items", [])
+    if not items:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    item = items[0]
+    post_pk = item["post_id"]
+    liked_by = item.get("liked_by") or set()
+    if sub in liked_by:
+        _posts_table.update_item(
+            Key={"post_id": post_pk},
+            UpdateExpression="ADD like_count :neg DELETE liked_by :sub_set",
+            ExpressionAttributeValues={":neg": -1, ":sub_set": {sub}},
+        )
+        return {"ok": True, "liked": False, "like_count": max(0, int(item.get("like_count", 0)) - 1)}
+    else:
+        _posts_table.update_item(
+            Key={"post_id": post_pk},
+            UpdateExpression="ADD like_count :one, liked_by :sub_set",
+            ExpressionAttributeValues={":one": 1, ":sub_set": {sub}},
+        )
+        return {"ok": True, "liked": True, "like_count": int(item.get("like_count", 0)) + 1}
+
+
 @app.get("/posts/{post_id}/content")
 async def get_post_content(post_id: str, request: Request):
     """Return the full content snapshot from S3 (no auth required for reading)."""
@@ -1071,16 +1101,18 @@ async def create_comment(post_id: str, request: Request):
     if not text:
         raise HTTPException(status_code=400, detail="댓글 내용이 필요합니다.")
 
+    parent_comment_id = body.get("parent_comment_id", "")
     _comments_table.put_item(Item={
-        "comment_id":   f"{sub}#{comment_id}",
-        "local_id":     str(comment_id),
-        "post_id":      str(post_id),
-        "author_sub":   sub,
-        "author_name":  author_name,
-        "author_color": author_color,
-        "text":         text,
-        "like_count":   0,
-        "created_at":   datetime.now(timezone.utc).isoformat(),
+        "comment_id":        f"{sub}#{comment_id}",
+        "local_id":          str(comment_id),
+        "post_id":           str(post_id),
+        "author_sub":        sub,
+        "author_name":       author_name,
+        "author_color":      author_color,
+        "text":              text,
+        "like_count":        0,
+        "parent_comment_id": parent_comment_id,
+        "created_at":        datetime.now(timezone.utc).isoformat(),
     })
 
     # Increment comment_count on the post (best-effort)
@@ -1115,6 +1147,36 @@ async def delete_comment(comment_id: int, request: Request):
         except Exception:
             pass
     return {"ok": True}
+
+
+@app.post("/comments/{comment_id}/like")
+async def toggle_comment_like(comment_id: str, request: Request):
+    """Toggle like on a comment. Returns {liked, like_count}."""
+    sub = _require_login(request)
+    res = _comments_table.scan(
+        FilterExpression="local_id = :lid",
+        ExpressionAttributeValues={":lid": str(comment_id)},
+    )
+    items = res.get("Items", [])
+    if not items:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    item = items[0]
+    comment_pk = item["comment_id"]
+    liked_by = item.get("liked_by") or set()
+    if sub in liked_by:
+        _comments_table.update_item(
+            Key={"comment_id": comment_pk},
+            UpdateExpression="ADD like_count :neg DELETE liked_by :sub_set",
+            ExpressionAttributeValues={":neg": -1, ":sub_set": {sub}},
+        )
+        return {"ok": True, "liked": False, "like_count": max(0, int(item.get("like_count", 0)) - 1)}
+    else:
+        _comments_table.update_item(
+            Key={"comment_id": comment_pk},
+            UpdateExpression="ADD like_count :one, liked_by :sub_set",
+            ExpressionAttributeValues={":one": 1, ":sub_set": {sub}},
+        )
+        return {"ok": True, "liked": True, "like_count": int(item.get("like_count", 0)) + 1}
 
 
 @app.get("/logout")

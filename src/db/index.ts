@@ -88,6 +88,7 @@ export interface CommunityComment {
   text: string;
   like_count: number;
   created_at: string;
+  parent_comment_id?: string;
 }
 
 export interface Work {

@@ -115,15 +115,15 @@ export default function ShareModal({ work, episode, plot, onClose, onSuccess }: 
             />
           </div>
 
-          {/* Description */}
+          {/* Description / body text */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">소개 (선택)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">하고 싶은 말</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={2}
+              rows={3}
               className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400 resize-none"
-              placeholder="작품을 짧게 소개해 주세요"
+              placeholder="예: 여러분 이 글 어떤가요? 댓글 남겨주세요!"
             />
           </div>
 

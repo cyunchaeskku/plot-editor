@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { CommunityPost } from '../../db';
+import { apiLikePost } from '../../api';
+import { useStore } from '../../store';
 
 interface PostCardProps {
   post: CommunityPost;
@@ -16,22 +18,46 @@ function Avatar({ name, color }: { name: string; color: string }) {
 }
 
 export default function PostCard({ post, selected, onClick }: PostCardProps) {
+  const { isLoggedIn } = useStore();
+  const [likeCount, setLikeCount] = useState(post.like_count);
+  const [liked, setLiked] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn || isLiking) return;
+    setIsLiking(true);
+    try {
+      const res = await apiLikePost(post.id);
+      setLiked(res.liked);
+      setLikeCount(res.like_count);
+    } catch {
+      // ignore
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
   return (
     <div
       className={`post-card${selected ? ' post-card--selected' : ''}`}
       onClick={onClick}
     >
-      {/* Header: avatar + title + menu */}
+      {/* Header: avatar + author + title */}
       <div className="flex items-start gap-2">
         <Avatar name={post.author_name} color={post.author_color} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="font-semibold text-[#1a0a06] text-sm leading-tight truncate">{post.post_title}</div>
-            <span className="text-gray-400 text-xs flex-shrink-0">···</span>
           </div>
-          <div className="text-xs text-gray-500 mt-0.5">{post.description}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{post.author_name}</div>
         </div>
       </div>
+
+      {/* Body text */}
+      {post.description && (
+        <p className="text-xs text-[#1a0a06] mt-2 leading-relaxed line-clamp-2">{post.description}</p>
+      )}
 
       {/* Content preview — branched by work_type */}
       {post.work_type === 'plot' ? (
@@ -74,7 +100,15 @@ export default function PostCard({ post, selected, onClick }: PostCardProps) {
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <span>👁 {post.view_count}</span>
-          <span>❤ {post.like_count}</span>
+          <button
+            onClick={handleLike}
+            disabled={!isLoggedIn || isLiking}
+            className={`flex items-center gap-0.5 transition-colors ${
+              liked ? 'text-red-500' : 'text-gray-500 hover:text-red-400'
+            } disabled:cursor-default`}
+          >
+            {liked ? '❤' : '♡'} {likeCount}
+          </button>
           <span>💬 {post.comment_count}</span>
         </div>
         <button

@@ -50,6 +50,7 @@ interface AppState {
   // Auth
   isLoggedIn: boolean;
   userEmail: string | null;
+  userSub: string | null;
 
   // Save lifecycle
   isDirty: boolean;
@@ -177,6 +178,7 @@ function findCharacter(
 export const useStore = create<AppState>((set, get) => ({
   isLoggedIn: false,
   userEmail: null,
+  userSub: null,
 
   isDirty: false,
   isSaving: false,
@@ -207,9 +209,9 @@ export const useStore = create<AppState>((set, get) => ({
   loadUserInfo: async () => {
     try {
       const data = await api.fetchMe();
-      set({ isLoggedIn: true, userEmail: data.email });
+      set({ isLoggedIn: true, userEmail: data.email, userSub: data.sub });
     } catch {
-      set({ isLoggedIn: false, userEmail: null });
+      set({ isLoggedIn: false, userEmail: null, userSub: null });
     }
   },
 

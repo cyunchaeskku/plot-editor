@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { CommunityPost, CommunityComment, PlotBlock, PlotFullContent, NovelFullContent } from '../../db';
-import { fetchComments, apiCreateComment, fetchPostContent } from '../../api';
+import { fetchComments, apiCreateComment, fetchPostContent, apiDeletePost, apiLikePost, apiLikeComment } from '../../api';
 import { useStore } from '../../store';
 
 type SortOrder = '최신순' | '인기순';
 
 interface ThreadDetailProps {
   post: CommunityPost | null;
+  onDeletePost?: () => void;
 }
 
 function Avatar({ name, color, size = 'md' }: { name: string; color: string; size?: 'sm' | 'md' }) {
@@ -72,9 +73,136 @@ function ReaderContent({ content }: { content: PlotFullContent | NovelFullConten
   );
 }
 
+// ── Comment item (with like + reply) ─────────────────────────────────────────
+
+interface CommentItemProps {
+  comment: CommunityComment;
+  replies: CommunityComment[];
+  isLoggedIn: boolean;
+  postId: string;
+  onRefresh: () => void;
+  depth?: number;
+}
+
+function CommentItem({ comment, replies, isLoggedIn, postId, onRefresh, depth = 0 }: CommentItemProps) {
+  const [likeCount, setLikeCount] = useState(comment.like_count);
+  const [liked, setLiked] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
+  const handleLike = async () => {
+    if (!isLoggedIn || isLiking) return;
+    setIsLiking(true);
+    try {
+      const res = await apiLikeComment(comment.id);
+      setLiked(res.liked);
+      setLikeCount(res.like_count);
+    } catch {
+      // ignore
+    } finally {
+      setIsLiking(false);
+    }
+  };
+
+  const handleSubmitReply = async () => {
+    const text = replyText.trim();
+    if (!text || isSubmittingReply) return;
+    setIsSubmittingReply(true);
+    try {
+      await apiCreateComment(postId, text, comment.id);
+      setReplyText('');
+      setShowReplyInput(false);
+      onRefresh();
+    } catch {
+      alert('답글 등록에 실패했습니다.');
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  return (
+    <div className={depth > 0 ? 'ml-6 mt-2' : ''}>
+      <div className="flex items-start gap-2">
+        <Avatar name={comment.author_name} color={comment.author_color} size="sm" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold text-[#1a0a06]">{comment.author_name}</span>
+            <span className="text-xs text-gray-400">{comment.created_at.slice(0, 10)}</span>
+          </div>
+          <p className="text-xs text-[#1a0a06] mt-0.5 leading-relaxed">{comment.text}</p>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={handleLike}
+              disabled={!isLoggedIn || isLiking}
+              className={`text-xs transition-colors ${liked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'} disabled:cursor-default`}
+            >
+              {liked ? '❤' : '♡'} {likeCount}
+            </button>
+            {isLoggedIn && depth === 0 && (
+              <button
+                onClick={() => setShowReplyInput((v) => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                답글 달기
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Replies */}
+      {replies.length > 0 && (
+        <div className="mt-2 flex flex-col gap-2">
+          {replies.map((reply) => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              replies={[]}
+              isLoggedIn={isLoggedIn}
+              postId={postId}
+              onRefresh={onRefresh}
+              depth={1}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Reply input */}
+      {showReplyInput && (
+        <div className="ml-6 mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitReply(); }}
+            placeholder="답글을 입력하세요..."
+            className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400"
+            autoFocus
+          />
+          <button
+            onClick={handleSubmitReply}
+            disabled={isSubmittingReply}
+            className="px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors disabled:opacity-50"
+          >
+            {isSubmittingReply ? '...' : '등록'}
+          </button>
+          <button
+            onClick={() => { setShowReplyInput(false); setReplyText(''); }}
+            className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+          >
+            취소
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ThreadDetail({ post }: ThreadDetailProps) {
+export default function ThreadDetail({ post, onDeletePost }: ThreadDetailProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>('최신순');
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<CommunityComment[]>([]);
@@ -83,12 +211,18 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
   const [readerContent, setReaderContent] = useState<PlotFullContent | NovelFullContent | null>(null);
   const [readerLoading, setReaderLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [postLikeCount, setPostLikeCount] = useState(0);
+  const [postLiked, setPostLiked] = useState(false);
+  const [isLikingPost, setIsLikingPost] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { isLoggedIn } = useStore();
+  const { isLoggedIn, userSub } = useStore();
 
-  // Load comments when post changes
+  // Reset per-post state when post changes
   useEffect(() => {
     if (!post) { setComments([]); return; }
+    setPostLikeCount(post.like_count);
+    setPostLiked(false);
     setCommentsLoading(true);
     setIsReaderMode(false);
     setReaderContent(null);
@@ -118,11 +252,26 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
     );
   }
 
+  // Build comment tree: top-level + replies map
   const sortedComments = [...comments].sort((a, b) =>
     sortOrder === '인기순'
       ? b.like_count - a.like_count
       : b.created_at.localeCompare(a.created_at)
   );
+  const topLevelComments = sortedComments.filter((c) => !c.parent_comment_id);
+  const repliesMap = new Map<string, CommunityComment[]>();
+  for (const c of sortedComments) {
+    if (c.parent_comment_id) {
+      const list = repliesMap.get(c.parent_comment_id) ?? [];
+      repliesMap.set(c.parent_comment_id, [...list, c]);
+    }
+  }
+
+  const refreshComments = () => {
+    fetchComments(post.id)
+      .then(setComments)
+      .catch(() => {});
+  };
 
   const handleSubmitComment = async () => {
     const text = newComment.trim();
@@ -131,13 +280,37 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
     try {
       await apiCreateComment(post.id, text);
       setNewComment('');
-      // Refresh comments
-      const updated = await fetchComments(post.id);
-      setComments(updated);
+      refreshComments();
     } catch {
       alert('댓글 등록에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLikePost = async () => {
+    if (!isLoggedIn || isLikingPost) return;
+    setIsLikingPost(true);
+    try {
+      const res = await apiLikePost(post.id);
+      setPostLiked(res.liked);
+      setPostLikeCount(res.like_count);
+    } catch {
+      // ignore
+    } finally {
+      setIsLikingPost(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!confirm('게시글을 삭제하시겠습니까?')) return;
+    setIsDeleting(true);
+    try {
+      await apiDeletePost(post.id);
+      onDeletePost?.();
+    } catch {
+      alert('삭제에 실패했습니다.');
+      setIsDeleting(false);
     }
   };
 
@@ -153,6 +326,8 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
       setReaderLoading(false);
     }
   };
+
+  const isAuthor = isLoggedIn && userSub && post.author_sub === userSub;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -209,7 +384,7 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
               <div className="flex items-center gap-2 mt-2">
                 <Avatar name={post.author_name} color={post.author_color} size="sm" />
                 <span className="text-xs text-gray-600">{post.author_name}</span>
-                <span className="text-xs text-gray-400">· {post.created_at}</span>
+                <span className="text-xs text-gray-400">· {post.created_at.slice(0, 10)}</span>
               </div>
             </div>
             <div className="border-t border-gray-100 pt-5">
@@ -219,16 +394,35 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
         ) : (
           /* ── Normal detail view ──────────────────────────────────── */
           <>
-            {/* Author info */}
-            <div className="flex items-start gap-2 mb-3">
-              <Avatar name={post.author_name} color={post.author_color} />
-              <div>
-                <div className="font-semibold text-sm text-[#1a0a06]">{post.author_name}</div>
-                <div className="text-xs text-gray-500">
-                  {post.post_title} · {post.created_at}
+            {/* Author info + delete button */}
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex items-start gap-2">
+                <Avatar name={post.author_name} color={post.author_color} />
+                <div>
+                  <div className="font-semibold text-sm text-[#1a0a06]">{post.author_name}</div>
+                  <div className="text-xs text-gray-500">
+                    {post.work_title} · {post.created_at.slice(0, 10)}
+                  </div>
                 </div>
               </div>
+              {isAuthor && (
+                <button
+                  onClick={handleDeletePost}
+                  disabled={isDeleting}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-50"
+                >
+                  {isDeleting ? '삭제 중...' : '삭제'}
+                </button>
+              )}
             </div>
+
+            {/* Post title */}
+            <h3 className="text-sm font-bold text-[#1a0a06] mb-2">{post.post_title}</h3>
+
+            {/* Body text */}
+            {post.description && (
+              <p className="text-sm text-[#1a0a06] mb-3 leading-relaxed">{post.description}</p>
+            )}
 
             {/* Content preview + "자세히 보기" button */}
             {post.work_type === 'plot' ? (
@@ -276,40 +470,41 @@ export default function ThreadDetail({ post }: ThreadDetailProps) {
               ))}
             </div>
 
-            {/* Stats */}
+            {/* Stats with functional like */}
             <div className="flex items-center gap-3 text-xs text-gray-500 mb-4 pb-3 border-b border-gray-100">
               <span>👁 {post.view_count}</span>
-              <span>❤ {post.like_count}</span>
+              <button
+                onClick={handleLikePost}
+                disabled={!isLoggedIn || isLikingPost}
+                className={`flex items-center gap-0.5 transition-colors ${
+                  postLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-400'
+                } disabled:cursor-default`}
+              >
+                {postLiked ? '❤' : '♡'} {postLikeCount}
+              </button>
               <span>💬 {post.comment_count}</span>
             </div>
 
             {/* Comments section */}
             <div className="text-xs font-semibold text-gray-700 mb-2">
-              댓글 {commentsLoading ? '...' : sortedComments.length}개
+              댓글 {commentsLoading ? '...' : topLevelComments.length}개
             </div>
 
-            <div className="flex flex-col gap-3 mb-4">
+            <div className="flex flex-col gap-4 mb-4">
               {commentsLoading ? (
                 <p className="text-xs text-gray-400">댓글을 불러오는 중...</p>
-              ) : sortedComments.length === 0 ? (
+              ) : topLevelComments.length === 0 ? (
                 <p className="text-xs text-gray-400">첫 댓글을 남겨보세요!</p>
               ) : (
-                sortedComments.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-2">
-                    <Avatar name={comment.author_name} color={comment.author_color} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-xs font-semibold text-[#1a0a06]">{comment.author_name}</span>
-                        <span className="text-xs text-gray-400">{comment.created_at}</span>
-                      </div>
-                      <p className="text-xs text-[#1a0a06] mt-0.5 leading-relaxed">{comment.text}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <button className="text-xs text-gray-400 hover:text-[#AD1B02] transition-colors">
-                          👍 {comment.like_count}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                topLevelComments.map((comment) => (
+                  <CommentItem
+                    key={comment.id}
+                    comment={comment}
+                    replies={repliesMap.get(comment.id) ?? []}
+                    isLoggedIn={isLoggedIn}
+                    postId={post.id}
+                    onRefresh={refreshComments}
+                  />
                 ))
               )}
             </div>

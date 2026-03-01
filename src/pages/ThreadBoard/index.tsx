@@ -21,7 +21,10 @@ export default function ThreadBoard() {
 
       {/* Right panel: detail */}
       <div className="flex-1 overflow-hidden flex flex-col bg-white">
-        <ThreadDetail post={selectedPost} />
+        <ThreadDetail
+          post={selectedPost}
+          onDeletePost={() => setSelectedPost(null)}
+        />
       </div>
     </>
   );

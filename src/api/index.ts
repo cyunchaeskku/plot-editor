@@ -345,6 +345,7 @@ function normalizeComment(item: any): CommunityComment {
     text: item.text ?? '',
     like_count: Number(item.like_count ?? 0),
     created_at: item.created_at ?? '',
+    parent_comment_id: item.parent_comment_id || undefined,
   };
 }
 
@@ -388,11 +389,23 @@ export async function fetchComments(postId: string): Promise<CommunityComment[]>
   return (items as any[]).map(normalizeComment);
 }
 
-export async function apiCreateComment(postId: string, text: string): Promise<void> {
+export async function apiCreateComment(postId: string, text: string, parentCommentId?: string): Promise<void> {
   const commentId = Date.now();
-  await apiFetch('POST', `/posts/${postId}/comments`, { comment_id: commentId, text });
+  await apiFetch('POST', `/posts/${postId}/comments`, {
+    comment_id: commentId,
+    text,
+    ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}),
+  });
 }
 
 export async function apiDeleteComment(commentId: string): Promise<void> {
   await apiFetch('DELETE', `/comments/${commentId}`);
+}
+
+export async function apiLikePost(postId: string): Promise<{ liked: boolean; like_count: number }> {
+  return apiFetch('POST', `/posts/${postId}/like`);
+}
+
+export async function apiLikeComment(commentId: string): Promise<{ liked: boolean; like_count: number }> {
+  return apiFetch('POST', `/comments/${commentId}/like`);
 }
