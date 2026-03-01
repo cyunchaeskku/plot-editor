@@ -209,3 +209,129 @@ input, textarea, button, select {
   font-family: inherit;
   font-size: inherit;
 }
+
+/* ── Thread Board ──────────────────────────────────────────────── */
+
+/* Post card */
+.post-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.post-card:hover {
+  border-color: #AD1B02;
+  box-shadow: 0 1px 4px rgba(173, 27, 2, 0.08);
+}
+.post-card--selected {
+  border-color: #AD1B02;
+  box-shadow: 0 0 0 2px rgba(173, 27, 2, 0.15);
+}
+
+/* Author avatar */
+.post-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.post-avatar--sm {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
+/* Tag badge */
+.post-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Scene preview block (inside post card / detail) */
+.scene-preview {
+  background: #fdf9f7;
+  border: 1px solid #f0e8e2;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+}
+.scene-preview__heading {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #E88D14;
+  font-size: 11px;
+  background: rgba(232, 141, 20, 0.1);
+  border-radius: 3px;
+  padding: 0.15rem 0.4rem;
+  display: inline-block;
+  margin-bottom: 0.3rem;
+}
+.scene-preview__meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 10px;
+  color: #9ca3af;
+  margin-bottom: 0.4rem;
+}
+.scene-preview__dialogues {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Dialogue line inside preview */
+.dialogue-preview {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border-left: 3px solid;
+  padding: 0.15rem 0.4rem;
+  font-size: 11px;
+}
+.dialogue-preview__name {
+  font-weight: 700;
+  color: #1a0a06;
+  white-space: nowrap;
+  font-size: 10px;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dialogue-preview__text {
+  color: #1a0a06;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Thread tab */
+.thread-tab {
+  padding: 0.3rem 0.75rem 0.5rem;
+  font-size: 12px;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.thread-tab:hover {
+  color: #1a0a06;
+}
+.thread-tab--active {
+  color: #AD1B02;
+  border-bottom-color: #AD1B02;
+  font-weight: 600;
+}
