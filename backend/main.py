@@ -160,6 +160,8 @@ _plots_table      = _dynamodb.Table("plots")
 _characters_table = _dynamodb.Table("characters")
 _relations_table  = _dynamodb.Table("character_relations")
 _graph_table      = _dynamodb.Table("graph_layouts")
+_posts_table      = _dynamodb.Table("community_posts")
+_comments_table   = _dynamodb.Table("community_comments")
 
 _s3 = boto3.client("s3", region_name=_region)
 _S3_BUCKET = os.getenv("S3_BUCKET", "")
@@ -900,6 +902,218 @@ async def save_graph_layout(work_id: int, request: Request):
         "positions":  positions,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
+    return {"ok": True}
+
+
+# ── Community helpers ──────────────────────────────────────────────────────
+
+def _sub_to_color(sub: str) -> str:
+    """Deterministic hex color from a Cognito sub string (mid-range, readable on white)."""
+    import hashlib
+    h = int(hashlib.md5(sub.encode()).hexdigest(), 16)
+    # Keep saturation and lightness in a readable range (avoid too bright/dark)
+    hue = h % 360
+    sat = 45 + (h >> 8) % 30     # 45–74%
+    lit = 35 + (h >> 16) % 25    # 35–59%
+    # Convert HSL → approximate hex
+    import colorsys
+    r, g, b = colorsys.hls_to_rgb(hue / 360, lit / 100, sat / 100)
+    return "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
+
+
+def _author_name_from_email(email: str) -> str:
+    return email.split("@")[0] if "@" in email else email
+
+
+def _decode_token_payload(request: Request) -> dict:
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else ""
+    try:
+        return pyjwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except Exception:
+        return {}
+
+
+# ── Community Posts ────────────────────────────────────────────────────────
+
+@app.get("/posts")
+async def get_posts(request: Request):
+    """Return up to 50 most recent public posts (no login required)."""
+    res = _posts_table.scan(Limit=200)
+    items = res.get("Items", [])
+    # Sort by created_at descending and cap at 50
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return items[:50]
+
+
+@app.get("/posts/mine")
+async def get_my_posts(request: Request):
+    """Return posts created by the logged-in user."""
+    sub = _require_login(request)
+    res = _posts_table.scan(
+        FilterExpression="author_sub = :s",
+        ExpressionAttributeValues={":s": sub},
+    )
+    items = res.get("Items", [])
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return items
+
+
+@app.post("/posts")
+async def create_post(request: Request):
+    """Create a community post, upload content snapshot to S3."""
+    sub = _require_login(request)
+    payload = _decode_token_payload(request)
+    email = payload.get("email", "")
+    author_name = _author_name_from_email(email)
+    author_color = _sub_to_color(sub)
+
+    body = await request.json()
+    post_id = body["post_id"]
+    content_snapshot = body.get("content_snapshot")
+
+    # Upload snapshot to S3
+    s3_key = f"posts/{sub}/{post_id}.json"
+    if content_snapshot is not None:
+        _s3.put_object(
+            Bucket=_S3_BUCKET,
+            Key=s3_key,
+            Body=json.dumps(content_snapshot, ensure_ascii=False),
+            ContentType="application/json",
+        )
+
+    _posts_table.put_item(Item={
+        "post_id":       f"{sub}#{post_id}",
+        "local_id":      str(post_id),
+        "author_sub":    sub,
+        "author_name":   author_name,
+        "author_color":  author_color,
+        "work_id":       body.get("work_id", 0),
+        "work_title":    body.get("work_title", ""),
+        "episode_title": body.get("episode_title", ""),
+        "work_type":     body.get("work_type", "plot"),
+        "post_title":    body.get("post_title", ""),
+        "description":   body.get("description", ""),
+        "tags":          body.get("tags", []),
+        "content_preview": body.get("content_preview", {}),
+        "content_s3_key": s3_key,
+        "view_count":    0,
+        "like_count":    0,
+        "comment_count": 0,
+        "created_at":    datetime.now(timezone.utc).isoformat(),
+        "updated_at":    datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True, "post_id": post_id}
+
+
+@app.delete("/posts/{post_id}")
+async def delete_post(post_id: int, request: Request):
+    sub = _require_login(request)
+    item = _posts_table.get_item(Key={"post_id": f"{sub}#{post_id}"}).get("Item")
+    if not item:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    s3_key = item.get("content_s3_key", "")
+    if s3_key:
+        try:
+            _s3.delete_object(Bucket=_S3_BUCKET, Key=s3_key)
+        except Exception:
+            pass
+    _posts_table.delete_item(Key={"post_id": f"{sub}#{post_id}"})
+    return {"ok": True}
+
+
+@app.get("/posts/{post_id}/content")
+async def get_post_content(post_id: str, request: Request):
+    """Return the full content snapshot from S3 (no auth required for reading)."""
+    # post_id may be "sub#local_id" or just numeric local_id
+    # We scan for the item to find the s3 key
+    res = _posts_table.scan(
+        FilterExpression="local_id = :lid",
+        ExpressionAttributeValues={":lid": str(post_id)},
+    )
+    items = res.get("Items", [])
+    if not items:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    s3_key = items[0].get("content_s3_key", "")
+    if not s3_key:
+        return {}
+    try:
+        obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
+        return json.loads(obj["Body"].read())
+    except Exception:
+        raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+
+
+# ── Community Comments ─────────────────────────────────────────────────────
+
+@app.get("/posts/{post_id}/comments")
+async def get_comments(post_id: str, request: Request):
+    res = _comments_table.scan(
+        FilterExpression="post_id = :pid",
+        ExpressionAttributeValues={":pid": str(post_id)},
+    )
+    items = res.get("Items", [])
+    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return items
+
+
+@app.post("/posts/{post_id}/comments")
+async def create_comment(post_id: str, request: Request):
+    sub = _require_login(request)
+    payload = _decode_token_payload(request)
+    email = payload.get("email", "")
+    author_name = _author_name_from_email(email)
+    author_color = _sub_to_color(sub)
+
+    body = await request.json()
+    comment_id = body.get("comment_id", int(datetime.now(timezone.utc).timestamp() * 1000))
+    text = body.get("text", "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="댓글 내용이 필요합니다.")
+
+    _comments_table.put_item(Item={
+        "comment_id":   f"{sub}#{comment_id}",
+        "local_id":     str(comment_id),
+        "post_id":      str(post_id),
+        "author_sub":   sub,
+        "author_name":  author_name,
+        "author_color": author_color,
+        "text":         text,
+        "like_count":   0,
+        "created_at":   datetime.now(timezone.utc).isoformat(),
+    })
+
+    # Increment comment_count on the post (best-effort)
+    try:
+        _posts_table.update_item(
+            Key={"post_id": post_id},
+            UpdateExpression="ADD comment_count :one",
+            ExpressionAttributeValues={":one": 1},
+        )
+    except Exception:
+        pass
+
+    return {"ok": True, "comment_id": comment_id}
+
+
+@app.delete("/comments/{comment_id}")
+async def delete_comment(comment_id: int, request: Request):
+    sub = _require_login(request)
+    item = _comments_table.get_item(Key={"comment_id": f"{sub}#{comment_id}"}).get("Item")
+    if not item:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    post_id = item.get("post_id", "")
+    _comments_table.delete_item(Key={"comment_id": f"{sub}#{comment_id}"})
+    # Decrement comment_count (best-effort)
+    if post_id:
+        try:
+            _posts_table.update_item(
+                Key={"post_id": post_id},
+                UpdateExpression="ADD comment_count :neg",
+                ExpressionAttributeValues={":neg": -1},
+            )
+        except Exception:
+            pass
     return {"ok": True}
 
 

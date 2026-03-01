@@ -11,6 +11,7 @@ import NovelEditor from '../components/NovelEditor';
 import ChapterList from '../components/NovelEditor/ChapterList';
 import ContinuousNovelEditor from '../components/NovelEditor/ContinuousNovelEditor';
 import ContinuousPlotEditor from '../components/Editor/ContinuousPlotEditor';
+import ShareModal from '../components/ShareModal';
 import { useStore } from '../store';
 
 export default function EditorPage() {
@@ -19,6 +20,7 @@ export default function EditorPage() {
     setRightPanelMode,
     selectedWorkId,
     selectedEpisodeId,
+    selectedPlotIds,
     episodes,
     works,
     plots,
@@ -71,6 +73,19 @@ export default function EditorPage() {
   const [scrollTargetEpisodeId, setScrollTargetEpisodeId] = useState<number | null>(null);
   const [plotViewMode, setPlotViewMode] = useState<'single' | 'continuous'>('single');
   const [scrollTargetPlotId, setScrollTargetPlotId] = useState<number | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  // Active plot for "공유하기"
+  const activePlotId = workType === 'novel' ? novelChapterPlotId : (selectedPlotIds[0] ?? null);
+  const activePlotEpisodeId = activePlotId
+    ? Object.keys(plots).find((epId) => plots[Number(epId)]?.some((p) => p.id === activePlotId))
+    : null;
+  const activePlot = activePlotId && activePlotEpisodeId
+    ? plots[Number(activePlotEpisodeId)]?.find((p) => p.id === activePlotId)
+    : null;
+  const activePlotEpisode = activePlotEpisodeId
+    ? episodeList.find((e) => e.id === Number(activePlotEpisodeId)) ?? null
+    : null;
 
   // When a chapter is selected in novel mode, ensure it has a plot and set novelChapterPlotId
   const handleSelectChapter = useCallback(async (episodeId: number) => {
@@ -142,6 +157,16 @@ export default function EditorPage() {
 
   return (
     <>
+      {/* Share Modal */}
+      {showShareModal && selectedWork && activePlot && activePlotEpisode && (
+        <ShareModal
+          work={selectedWork}
+          episode={activePlotEpisode}
+          plot={activePlot}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
+
       {/* Middle Panel */}
       <div className="w-72 flex-shrink-0 border-r border-gray-200 overflow-hidden flex flex-col">
         {workType === 'novel' ? (
@@ -212,6 +237,15 @@ export default function EditorPage() {
           >
             🌐 커뮤니티
           </Link>
+          {/* Share button — shown when a plot is active and user is logged in */}
+          {isLoggedIn && activePlot && selectedWork && activePlotEpisode && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="px-3 py-1 text-xs rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              📤 공유하기
+            </button>
+          )}
           {/* Save button */}
           {selectedWorkId && isLoggedIn && (
             <button

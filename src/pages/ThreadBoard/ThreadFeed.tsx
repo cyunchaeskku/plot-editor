@@ -1,35 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import PostCard from './PostCard';
-import { DUMMY_POSTS } from './dummyData';
-import type { Post } from './dummyData';
+import type { CommunityPost } from '../../db';
+import { fetchPosts, fetchMyPosts } from '../../api';
+import { useStore } from '../../store';
 
 type FeedTab = '광장' | '내 글' | '알림';
 
 interface ThreadFeedProps {
-  selectedPostId: number | null;
-  onSelectPost: (post: Post) => void;
-  onExpandPost: (post: Post) => void;
+  selectedPostId: string | null;
+  onSelectPost: (post: CommunityPost) => void;
+  onNewPost?: () => void;
 }
 
-export default function ThreadFeed({ selectedPostId, onSelectPost, onExpandPost }: ThreadFeedProps) {
+export default function ThreadFeed({ selectedPostId, onSelectPost, onNewPost }: ThreadFeedProps) {
   const [activeTab, setActiveTab] = useState<FeedTab>('광장');
   const [searchQuery, setSearchQuery] = useState('');
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const { isLoggedIn } = useStore();
 
   const tabs: FeedTab[] = ['광장', '내 글', '알림'];
 
-  const filteredPosts = DUMMY_POSTS.filter((p) => {
-    if (activeTab === '내 글') return p.author_name === '김소연';
-    if (activeTab === '알림') return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        p.post_title.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
-      );
+  const loadPosts = useCallback(async () => {
+    if (activeTab === '알림') return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const data = activeTab === '내 글' ? await fetchMyPosts() : await fetchPosts();
+      setPosts(data);
+    } catch (err: any) {
+      setError('게시글을 불러오지 못했습니다.');
+    } finally {
+      setIsLoading(false);
     }
-    return true;
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  const filteredPosts = posts.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      p.post_title.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.tags.some((t) => t.toLowerCase().includes(q))
+    );
   });
 
   return (
@@ -69,9 +89,14 @@ export default function ThreadFeed({ selectedPostId, onSelectPost, onExpandPost 
             className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded bg-white focus:outline-none focus:border-gray-400"
           />
         </div>
-        <button className="flex-shrink-0 px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors whitespace-nowrap">
-          + 새로운 글 쓰기
-        </button>
+        {isLoggedIn && (
+          <button
+            onClick={onNewPost}
+            className="flex-shrink-0 px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors whitespace-nowrap"
+          >
+            + 공유하기
+          </button>
+        )}
       </div>
 
       {/* Feed list */}
@@ -80,6 +105,22 @@ export default function ThreadFeed({ selectedPostId, onSelectPost, onExpandPost 
           <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
             <div className="text-2xl">🔔</div>
             <p>새로운 알림이 없습니다</p>
+          </div>
+        ) : isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
+            <div className="text-2xl">⏳</div>
+            <p>불러오는 중...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
+            <div className="text-2xl">⚠️</div>
+            <p>{error}</p>
+            <button
+              onClick={loadPosts}
+              className="px-3 py-1 text-xs text-[#AD1B02] border border-[#AD1B02] rounded hover:bg-[#AD1B02] hover:text-white transition-colors"
+            >
+              다시 시도
+            </button>
           </div>
         ) : filteredPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 text-xs gap-2">
@@ -93,7 +134,6 @@ export default function ThreadFeed({ selectedPostId, onSelectPost, onExpandPost 
               post={post}
               selected={selectedPostId === post.id}
               onClick={() => onSelectPost(post)}
-              onExpand={() => onExpandPost(post)}
             />
           ))
         )}

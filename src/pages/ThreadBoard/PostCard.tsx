@@ -1,11 +1,10 @@
 import React from 'react';
-import type { Post } from './dummyData';
+import type { CommunityPost } from '../../db';
 
 interface PostCardProps {
-  post: Post;
+  post: CommunityPost;
   selected: boolean;
   onClick: () => void;
-  onExpand: () => void;
 }
 
 function Avatar({ name, color }: { name: string; color: string }) {
@@ -16,7 +15,7 @@ function Avatar({ name, color }: { name: string; color: string }) {
   );
 }
 
-export default function PostCard({ post, selected, onClick, onExpand }: PostCardProps) {
+export default function PostCard({ post, selected, onClick }: PostCardProps) {
   return (
     <div
       className={`post-card${selected ? ' post-card--selected' : ''}`}
@@ -80,7 +79,7 @@ export default function PostCard({ post, selected, onClick, onExpand }: PostCard
         </div>
         <button
           className="text-xs text-[#AD1B02] hover:underline font-medium"
-          onClick={(e) => { e.stopPropagation(); onExpand(); }}
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
         >
           자세히 보기 ↗
         </button>

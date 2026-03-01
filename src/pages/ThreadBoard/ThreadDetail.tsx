@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import type { Post, Comment, PlotBlock } from './dummyData';
-import { DUMMY_COMMENTS, DUMMY_POSTS } from './dummyData';
+import type { CommunityPost, CommunityComment, PlotBlock, PlotFullContent, NovelFullContent } from '../../db';
+import { fetchComments, apiCreateComment, fetchPostContent } from '../../api';
+import { useStore } from '../../store';
 
 type SortOrder = '최신순' | '인기순';
 
 interface ThreadDetailProps {
-  post: Post | null;
-  expanded: boolean;
-  onExpand: (post: Post) => void;
-  onCollapse: () => void;
+  post: CommunityPost | null;
 }
 
 function Avatar({ name, color, size = 'md' }: { name: string; color: string; size?: 'sm' | 'md' }) {
@@ -40,13 +38,13 @@ function PlotBlockItem({ block }: { block: PlotBlock }) {
   return <div className="reader-stage-direction">{block.text}</div>;
 }
 
-// ── Reader mode ───────────────────────────────────────────────────────────────
+// ── Reader mode content ───────────────────────────────────────────────────────
 
-function ReaderContent({ post }: { post: Post }) {
-  if (post.work_type === 'plot') {
+function ReaderContent({ content }: { content: PlotFullContent | NovelFullContent }) {
+  if (content.type === 'plot') {
     return (
       <div className="reader-plot">
-        {post.full_content.scenes.map((scene, si) => (
+        {content.scenes.map((scene, si) => (
           <div key={si} className="reader-scene">
             <div className="reader-scene__heading">{scene.scene_heading}</div>
             <div className="reader-scene__meta">
@@ -64,11 +62,10 @@ function ReaderContent({ post }: { post: Post }) {
     );
   }
 
-  // novel
   return (
     <div className="reader-novel">
-      <h3 className="reader-novel__chapter">{post.full_content.chapter_title}</h3>
-      {post.full_content.paragraphs.map((para, i) => (
+      <h3 className="reader-novel__chapter">{content.chapter_title}</h3>
+      {content.paragraphs.map((para, i) => (
         <p key={i} className="reader-novel__paragraph">{para}</p>
       ))}
     </div>
@@ -77,11 +74,29 @@ function ReaderContent({ post }: { post: Post }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: ThreadDetailProps) {
+export default function ThreadDetail({ post }: ThreadDetailProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>('최신순');
   const [newComment, setNewComment] = useState('');
-  const [localComments, setLocalComments] = useState<Comment[]>(DUMMY_COMMENTS);
+  const [comments, setComments] = useState<CommunityComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
   const [isReaderMode, setIsReaderMode] = useState(false);
+  const [readerContent, setReaderContent] = useState<PlotFullContent | NovelFullContent | null>(null);
+  const [readerLoading, setReaderLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { isLoggedIn } = useStore();
+
+  // Load comments when post changes
+  useEffect(() => {
+    if (!post) { setComments([]); return; }
+    setCommentsLoading(true);
+    setIsReaderMode(false);
+    setReaderContent(null);
+    fetchComments(post.id)
+      .then(setComments)
+      .catch(() => setComments([]))
+      .finally(() => setCommentsLoading(false));
+  }, [post?.id]);
 
   if (!post) {
     return (
@@ -103,32 +118,41 @@ export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: T
     );
   }
 
-  const postComments = localComments
-    .filter((c) => c.post_id === post.id)
-    .sort((a, b) =>
-      sortOrder === '인기순' ? b.like_count - a.like_count : b.id - a.id
-    );
+  const sortedComments = [...comments].sort((a, b) =>
+    sortOrder === '인기순'
+      ? b.like_count - a.like_count
+      : b.created_at.localeCompare(a.created_at)
+  );
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = async () => {
     const text = newComment.trim();
-    if (!text) return;
-    const comment: Comment = {
-      id: Date.now(),
-      post_id: post.id,
-      author_name: '나',
-      author_color: '#AD1B02',
-      text,
-      created_at: '방금 전',
-      like_count: 0,
-    };
-    setLocalComments((prev) => [...prev, comment]);
-    setNewComment('');
+    if (!text || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await apiCreateComment(post.id, text);
+      setNewComment('');
+      // Refresh comments
+      const updated = await fetchComments(post.id);
+      setComments(updated);
+    } catch {
+      alert('댓글 등록에 실패했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const contentClass = expanded
-    ? 'flex-1 overflow-y-auto py-6 px-6'
-    : 'flex-1 overflow-y-auto px-4 py-3';
-  const innerClass = expanded ? 'max-w-2xl mx-auto' : '';
+  const handleOpenReader = async () => {
+    setReaderLoading(true);
+    try {
+      const raw = await fetchPostContent(post.id);
+      setReaderContent(raw);
+      setIsReaderMode(true);
+    } catch {
+      alert('내용을 불러오지 못했습니다.');
+    } finally {
+      setReaderLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -137,17 +161,10 @@ export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: T
         <div className="flex items-center gap-2 min-w-0">
           {isReaderMode ? (
             <button
-              onClick={() => setIsReaderMode(false)}
+              onClick={() => { setIsReaderMode(false); setReaderContent(null); }}
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#AD1B02] transition-colors flex-shrink-0"
             >
               ← 닫기
-            </button>
-          ) : expanded ? (
-            <button
-              onClick={onCollapse}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#AD1B02] transition-colors flex-shrink-0"
-            >
-              ← 목록으로
             </button>
           ) : (
             <span className="text-sm font-semibold text-[#1a0a06] truncate">{post.episode_title}</span>
@@ -170,15 +187,6 @@ export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: T
                   {order}
                 </button>
               ))}
-              {!expanded && (
-                <button
-                  onClick={() => onExpand(post)}
-                  className="px-2 py-0.5 text-xs text-gray-500 hover:text-[#AD1B02] transition-colors border border-gray-200 rounded"
-                  title="넓게 보기"
-                >
-                  ⤢ 넓게
-                </button>
-              )}
             </>
           )}
           <Link
@@ -191,134 +199,128 @@ export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: T
       </div>
 
       {/* Scrollable content */}
-      <div className={contentClass}>
-        <div className={innerClass}>
-          {isReaderMode ? (
-            /* ── Reader mode ─────────────────────────────────────────── */
-            <div>
-              {/* Reader header */}
-              <div className="mb-5">
-                <div className="text-xs text-gray-400 mb-1">{post.work_title} · {post.episode_title}</div>
-                <h2 className="text-base font-bold text-[#1a0a06]">{post.post_title}</h2>
-                <div className="flex items-center gap-2 mt-2">
-                  <Avatar name={post.author_name} color={post.author_color} size="sm" />
-                  <span className="text-xs text-gray-600">{post.author_name}</span>
-                  <span className="text-xs text-gray-400">· {post.created_at}</span>
-                </div>
-              </div>
-              <div className="border-t border-gray-100 pt-5">
-                <ReaderContent post={post} />
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {isReaderMode && readerContent ? (
+          /* ── Reader mode ─────────────────────────────────────────── */
+          <div>
+            <div className="mb-5">
+              <div className="text-xs text-gray-400 mb-1">{post.work_title} · {post.episode_title}</div>
+              <h2 className="text-base font-bold text-[#1a0a06]">{post.post_title}</h2>
+              <div className="flex items-center gap-2 mt-2">
+                <Avatar name={post.author_name} color={post.author_color} size="sm" />
+                <span className="text-xs text-gray-600">{post.author_name}</span>
+                <span className="text-xs text-gray-400">· {post.created_at}</span>
               </div>
             </div>
-          ) : (
-            /* ── Normal detail view ──────────────────────────────────── */
-            <>
-              {expanded && (
-                <h2 className="text-lg font-bold text-[#1a0a06] mb-1">{post.post_title}</h2>
-              )}
-
-              {/* Author info */}
-              <div className="flex items-start gap-2 mb-3">
-                <Avatar name={post.author_name} color={post.author_color} />
-                <div>
-                  <div className="font-semibold text-sm text-[#1a0a06]">{post.author_name}</div>
-                  <div className="text-xs text-gray-500">
-                    {expanded ? post.episode_title : post.post_title} · {post.created_at}
-                  </div>
+            <div className="border-t border-gray-100 pt-5">
+              <ReaderContent content={readerContent} />
+            </div>
+          </div>
+        ) : (
+          /* ── Normal detail view ──────────────────────────────────── */
+          <>
+            {/* Author info */}
+            <div className="flex items-start gap-2 mb-3">
+              <Avatar name={post.author_name} color={post.author_color} />
+              <div>
+                <div className="font-semibold text-sm text-[#1a0a06]">{post.author_name}</div>
+                <div className="text-xs text-gray-500">
+                  {post.post_title} · {post.created_at}
                 </div>
               </div>
+            </div>
 
-              {/* Content preview + "자세히 보기" button */}
-              {post.work_type === 'plot' ? (
-                <div className="scene-preview mb-1">
-                  <div className="scene-preview__heading">{post.content_preview.scene_heading}</div>
-                  <div className="scene-preview__meta">
-                    <span>📍 {post.content_preview.scene_location}</span>
-                    <span>⏱ {post.content_preview.scene_time}</span>
-                  </div>
-                  <div className="scene-preview__dialogues">
-                    {post.content_preview.dialogues.map((d, i) => (
-                      <div
-                        key={i}
-                        className="dialogue-preview"
-                        style={{ borderLeftColor: d.character_color }}
-                      >
-                        <span className="dialogue-preview__name">{d.character_name}</span>
-                        <span className="dialogue-preview__text">{d.text}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Content preview + "자세히 보기" button */}
+            {post.work_type === 'plot' ? (
+              <div className="scene-preview mb-1">
+                <div className="scene-preview__heading">{post.content_preview.scene_heading}</div>
+                <div className="scene-preview__meta">
+                  <span>📍 {post.content_preview.scene_location}</span>
+                  <span>⏱ {post.content_preview.scene_time}</span>
                 </div>
+                <div className="scene-preview__dialogues">
+                  {post.content_preview.dialogues.map((d, i) => (
+                    <div
+                      key={i}
+                      className="dialogue-preview"
+                      style={{ borderLeftColor: d.character_color }}
+                    >
+                      <span className="dialogue-preview__name">{d.character_name}</span>
+                      <span className="dialogue-preview__text">{d.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="novel-preview mb-1">
+                <div className="novel-preview__chapter">{post.content_preview.chapter_title}</div>
+                <div className="novel-preview__excerpt">{post.content_preview.excerpt}</div>
+              </div>
+            )}
+
+            {/* 자세히 보기 button */}
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={handleOpenReader}
+                disabled={readerLoading}
+                className="text-xs text-[#AD1B02] hover:underline font-medium disabled:opacity-50"
+              >
+                {readerLoading ? '불러오는 중...' : '자세히 보기 ↗'}
+              </button>
+            </div>
+
+            {/* Tags */}
+            <div className="flex flex-wrap gap-1 mb-4">
+              {post.tags.map((tag) => (
+                <span key={tag} className="post-tag">#{tag}</span>
+              ))}
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center gap-3 text-xs text-gray-500 mb-4 pb-3 border-b border-gray-100">
+              <span>👁 {post.view_count}</span>
+              <span>❤ {post.like_count}</span>
+              <span>💬 {post.comment_count}</span>
+            </div>
+
+            {/* Comments section */}
+            <div className="text-xs font-semibold text-gray-700 mb-2">
+              댓글 {commentsLoading ? '...' : sortedComments.length}개
+            </div>
+
+            <div className="flex flex-col gap-3 mb-4">
+              {commentsLoading ? (
+                <p className="text-xs text-gray-400">댓글을 불러오는 중...</p>
+              ) : sortedComments.length === 0 ? (
+                <p className="text-xs text-gray-400">첫 댓글을 남겨보세요!</p>
               ) : (
-                <div className="novel-preview mb-1">
-                  <div className="novel-preview__chapter">{post.content_preview.chapter_title}</div>
-                  <div className="novel-preview__excerpt">{post.content_preview.excerpt}</div>
-                </div>
-              )}
-
-              {/* 자세히 보기 button — bottom-right of preview */}
-              <div className="flex justify-end mb-3">
-                <button
-                  onClick={() => setIsReaderMode(true)}
-                  className="text-xs text-[#AD1B02] hover:underline font-medium"
-                >
-                  자세히 보기 ↗
-                </button>
-              </div>
-
-              {/* Tags */}
-              <div className="flex flex-wrap gap-1 mb-4">
-                {post.tags.map((tag) => (
-                  <span key={tag} className="post-tag">#{tag}</span>
-                ))}
-              </div>
-
-              {/* Stats */}
-              <div className="flex items-center gap-3 text-xs text-gray-500 mb-4 pb-3 border-b border-gray-100">
-                <span>👁 {post.view_count}</span>
-                <span>❤ {post.like_count}</span>
-                <span>💬 {post.comment_count}</span>
-              </div>
-
-              {/* Comments section */}
-              <div className="text-xs font-semibold text-gray-700 mb-2">댓글 {postComments.length}개</div>
-
-              <div className="flex flex-col gap-3 mb-4">
-                {postComments.length === 0 ? (
-                  <p className="text-xs text-gray-400">첫 댓글을 남겨보세요!</p>
-                ) : (
-                  postComments.map((comment) => (
-                    <div key={comment.id} className="flex items-start gap-2">
-                      <Avatar name={comment.author_name} color={comment.author_color} size="sm" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold text-[#1a0a06]">{comment.author_name}</span>
-                          <span className="text-xs text-gray-400">{comment.created_at}</span>
-                        </div>
-                        <p className="text-xs text-[#1a0a06] mt-0.5 leading-relaxed">{comment.text}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <button className="text-xs text-gray-400 hover:text-[#AD1B02] transition-colors">
-                            👍 {comment.like_count}
-                          </button>
-                          <button className="text-xs text-gray-400 hover:text-[#AD1B02] transition-colors">
-                            💬 답달
-                          </button>
-                        </div>
+                sortedComments.map((comment) => (
+                  <div key={comment.id} className="flex items-start gap-2">
+                    <Avatar name={comment.author_name} color={comment.author_color} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xs font-semibold text-[#1a0a06]">{comment.author_name}</span>
+                        <span className="text-xs text-gray-400">{comment.created_at}</span>
+                      </div>
+                      <p className="text-xs text-[#1a0a06] mt-0.5 leading-relaxed">{comment.text}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button className="text-xs text-gray-400 hover:text-[#AD1B02] transition-colors">
+                          👍 {comment.like_count}
+                        </button>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Comment input — hidden in reader mode */}
-      {!isReaderMode && (
+      {/* Comment input — hidden in reader mode, requires login */}
+      {!isReaderMode && isLoggedIn && (
         <div className="border-t border-gray-200 px-4 py-2 flex-shrink-0">
-          <div className={`flex items-center gap-2 ${expanded ? 'max-w-2xl mx-auto' : ''}`}>
-            <Avatar name="나" color="#AD1B02" size="sm" />
+          <div className="flex items-center gap-2">
             <input
               type="text"
               value={newComment}
@@ -329,18 +331,12 @@ export default function ThreadDetail({ post, expanded, onExpand, onCollapse }: T
             />
             <button
               onClick={handleSubmitComment}
-              className="px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors"
+              disabled={isSubmitting}
+              className="px-2 py-1.5 text-xs bg-[#AD1B02] text-white rounded hover:bg-[#8a1500] transition-colors disabled:opacity-50"
             >
-              등록
+              {isSubmitting ? '...' : '등록'}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Footer stats — hidden in reader mode */}
-      {!isReaderMode && (
-        <div className="border-t border-gray-100 px-4 py-2 text-center flex-shrink-0">
-          <span className="text-xs text-gray-400">{DUMMY_POSTS.length}건의 게시글 · 6명의 온라인 작가</span>
         </div>
       )}
     </div>

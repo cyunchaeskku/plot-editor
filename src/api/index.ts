@@ -1,4 +1,4 @@
-import type { Work, Episode, Plot, Character, CharacterRelation, WorkType } from '../db';
+import type { Work, Episode, Plot, Character, CharacterRelation, WorkType, CommunityPost, CommunityComment, PlotFullContent, NovelFullContent } from '../db';
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string) ?? '';
 
@@ -307,4 +307,92 @@ export async function apiCreateRelation(
 
 export async function apiDeleteRelation(id: number): Promise<void> {
   await apiFetch('DELETE', `/relations/${id}`);
+}
+
+// ── Community Posts ────────────────────────────────────────────────────────────
+
+function normalizePost(item: any): CommunityPost {
+  const base = {
+    id: String(item.local_id ?? item.post_id),
+    author_sub: item.author_sub ?? '',
+    author_name: item.author_name ?? '',
+    author_color: item.author_color ?? '#666666',
+    work_id: Number(item.work_id ?? 0),
+    work_title: item.work_title ?? '',
+    episode_title: item.episode_title ?? '',
+    post_title: item.post_title ?? '',
+    description: item.description ?? '',
+    tags: item.tags ?? [],
+    view_count: Number(item.view_count ?? 0),
+    like_count: Number(item.like_count ?? 0),
+    comment_count: Number(item.comment_count ?? 0),
+    created_at: item.created_at ?? '',
+    content_preview: item.content_preview ?? {},
+  };
+  if (item.work_type === 'novel') {
+    return { ...base, work_type: 'novel', content_preview: item.content_preview ?? { chapter_title: '', excerpt: '' } };
+  }
+  return { ...base, work_type: 'plot', content_preview: item.content_preview ?? { scene_heading: '', scene_location: '', scene_time: '', dialogues: [] } };
+}
+
+function normalizeComment(item: any): CommunityComment {
+  return {
+    id: String(item.local_id ?? item.comment_id),
+    post_id: String(item.post_id),
+    author_sub: item.author_sub ?? '',
+    author_name: item.author_name ?? '',
+    author_color: item.author_color ?? '#666666',
+    text: item.text ?? '',
+    like_count: Number(item.like_count ?? 0),
+    created_at: item.created_at ?? '',
+  };
+}
+
+export async function fetchPosts(): Promise<CommunityPost[]> {
+  const items = await apiFetch('GET', '/posts');
+  return (items as any[]).map(normalizePost);
+}
+
+export async function fetchMyPosts(): Promise<CommunityPost[]> {
+  const items = await apiFetch('GET', '/posts/mine');
+  return (items as any[]).map(normalizePost);
+}
+
+export interface CreatePostData {
+  post_id: number;
+  work_id: number;
+  work_title: string;
+  episode_title: string;
+  work_type: WorkType;
+  post_title: string;
+  description: string;
+  tags: string[];
+  content_preview: object;
+  content_snapshot: PlotFullContent | NovelFullContent;
+}
+
+export async function apiCreatePost(data: CreatePostData): Promise<void> {
+  await apiFetch('POST', '/posts', data);
+}
+
+export async function apiDeletePost(postId: string): Promise<void> {
+  await apiFetch('DELETE', `/posts/${postId}`);
+}
+
+export async function fetchPostContent(postId: string): Promise<PlotFullContent | NovelFullContent> {
+  return apiFetch('GET', `/posts/${postId}/content`);
+}
+
+export async function fetchComments(postId: string): Promise<CommunityComment[]> {
+  const items = await apiFetch('GET', `/posts/${postId}/comments`);
+  return (items as any[]).map(normalizeComment);
+}
+
+export async function apiCreateComment(postId: string, text: string): Promise<void> {
+  const commentId = Date.now();
+  await apiFetch('POST', `/posts/${postId}/comments`, { comment_id: commentId, text });
+}
+
+export async function apiDeleteComment(commentId: string): Promise<void> {
+  await apiFetch('DELETE', `/comments/${commentId}`);
 }
