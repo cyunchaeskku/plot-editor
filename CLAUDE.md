@@ -35,20 +35,29 @@ Characters    │                │
 
 ### Data Flow
 
-All persistent state flows through two layers:
+All state flows through three layers:
 
-1. **`src/db/index.ts`** — Raw SQLite queries via `@tauri-apps/plugin-sql`. Singleton `getDb()` initialises the DB on first call and runs `CREATE TABLE IF NOT EXISTS` migrations inline. All types (`Work`, `Episode`, `Plot`, `Character`, `CharacterRelation`) are defined here.
+1. **`src/db/index.ts`** — TypeScript type definitions only. No database queries (SQLite/IndexedDB removed). Defines all data types: `Work`, `Episode`, `Plot`, `Character`, `CharacterRelation`.
 
-2. **`src/store/index.ts`** — Single Zustand store. All components read from and write to this store exclusively; they never call `src/db` directly. The store's data is keyed by parent ID (e.g. `episodes: Record<number, Episode[]>`, `plots: Record<number, Plot[]>`). Selecting a work triggers cascaded loads: episodes → characters → relations.
+2. **`src/api/index.ts`** — AWS REST API layer. Calls backend endpoints on AWS Lambda. Normalizes responses from DynamoDB/S3 (`local_id` → `id`). Functions: `fetchWorks()`, `apiCreateWork()`, `summarizePlot()`, etc.
 
-### SQLite DB
+3. **`src/store/index.ts`** — Single Zustand store (in-memory). All components read from and write to this store exclusively; they never call `src/api` or `src/db` directly. Maintains pending mutation queues (`pendingCreates`, `pendingUpdates`, `pendingDeletes`, `dirtyPlotContents`). On user-triggered save (`saveAll(workId)`), batches all changes and sends to AWS. Data keyed by parent ID (e.g. `episodes: Record<number, Episode[]>`, `plots: Record<number, Plot[]>`).
 
-File: `ploteditor.db` (Tauri app data dir, configured in `tauri.conf.json` `plugins.sql.preloadConnections`).
+### AWS DynamoDB + S3
 
-Hierarchy: `works` → `episodes` → `plots` (all cascade delete). Characters belong to a work; relations are a join between two characters.
+**DynamoDB tables** (`src/store` mirrors these):
+- `works`: work_id (`{sub}#{local_id}`), title, type (`'plot'` or `'novel'`), planning_doc, work_summary, created_at, updated_at
+- `episodes`: episode_id, work_id, title, chapter_summary, order_index, created_at, updated_at
+- `plots`: plot_id, episode_id, title, plot_summary, content_s3_key, order_index, created_at, updated_at
+- `characters`: character_id, work_id, name, color, properties, memo, image, ai_summary, created_at, updated_at
+- `character_relations`: relation_id, work_id, from_character_id, to_character_id, relation_name, created_at
+- `graph_layouts`: layout_id, work_id, layout_data (JSON positions), updated_at
 
-`plots.content` stores TipTap JSON as a serialised string (`JSON.stringify(editor.getJSON())`).
-`characters.properties` stores free-form key-value pairs as a serialised JSON object.
+**S3 storage**:
+- `plots/{sub}/{plot_id}.json` — TipTap JSON editor content
+- PK format: All DynamoDB PKs use `{Cognito sub}#{local_id}` for user namespacing.
+
+**Properties field**: `characters.properties` stores free-form key-value pairs as JSON object.
 
 ### Editor
 
@@ -65,7 +74,7 @@ The `Dialogue` node stores `characterName` and `characterColor` as TipTap node a
 
 The `Dialogue` node has `addKeyboardShortcuts` — Enter on a non-empty dialogue block inserts a new dialogue block with the same `characterName`/`characterColor`; Enter on an empty dialogue block converts it to a `paragraph`.
 
-Plot content auto-saves with a 500 ms debounce on every editor update. An `isLoadingRef` guard prevents saving during programmatic content loads.
+Plot content changes are captured on every editor `onUpdate` event via `store.setPlotContent(activePlotId, content)`, which marks the plot as dirty. An `isLoadingRef` guard prevents redundant updates during programmatic content loads. Data persists to AWS S3 only when user clicks Save button or presses Cmd+S/Ctrl+S.
 
 ### Graph View
 
@@ -76,7 +85,7 @@ Edges use `type: 'smoothstep'` and `MarkerType.ArrowClosed`. Relations are owned
 ### Tauri Plugins
 
 Registered in `src-tauri/src/lib.rs`:
-- `tauri-plugin-sql` (SQLite)
+- `tauri-plugin-sql` (SQLite) — legacy, no longer actively used for CRUD
 - `tauri-plugin-dialog` (save-file dialog for export)
 - `tauri-plugin-fs` (write exported files)
 
@@ -96,7 +105,7 @@ Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.
 
 **Authentication**: Cognito OIDC via `authlib`. JWT Bearer token issued at OAuth callback (`/authorize`), valid for 30 days (HS256, signed with `SECRET_KEY`). `_require_login(request)` helper reads `Authorization: Bearer {token}` header and decodes JWT, or raises HTTP 401.
 
-**Endpoints** (19 total):
+**Endpoints** (20 total):
 
 | Group | Method + Path | Notes |
 |---|---|---|
@@ -110,6 +119,7 @@ Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.
 | Episodes | `PUT/DELETE /episodes/{id}` | Update / delete |
 | Plots | `GET/POST /episodes/{id}/plots` | List / create |
 | Plots | `PUT/DELETE /plots/{id}` | Update meta / delete (also deletes S3 object) |
+| Plots | `POST /plots/{id}/summarize` | Generate AI plot summary via OpenAI GPT-4o-mini |
 | Plots | `PUT /plots/{id}/content` | Save TipTap JSON to S3 |
 | Plots | `GET /plots/{id}/content` | Read TipTap JSON from S3 |
 | Characters | `GET/POST /works/{id}/characters` | List / create (includes `ai_summary` field) |
@@ -119,6 +129,23 @@ Requires `backend/.env` (gitignored) with Cognito + AWS credentials. See README.
 | Relations | `GET/POST /works/{id}/relations` | List / create |
 | Relations | `DELETE /relations/{id}` | Delete |
 | Graph | `GET/PUT /graph-layout/{workId}` | Node positions `{charId: {x,y}}` |
+
+### AI System Prompts (`backend/main.py`)
+
+세 개의 AI 요약 엔드포인트에서 각각 두 가지 모드(최초 생성 / 기존 요약 갱신)로 분기됩니다.
+
+| 엔드포인트 | 조건 | 줄 번호 | 역할 |
+|---|---|---|---|
+| `POST /plots/{id}/summarize` | 항상 동일 | L541 | 플롯 본문을 읽고 주요 사건을 3~4줄로 요약 (plot 모드) |
+| `POST /episodes/{id}/summarize` | 항상 동일 | L433 | 소설 챕터 본문을 읽고 주요 사건을 4~5줄로 요약 (novel 모드) |
+| `POST /works/{id}/summarize` | plot 타입 | L287 | 플롯 요약들을 바탕으로 작품 전체 줄거리 생성 |
+| `POST /works/{id}/summarize` | novel 타입 | L287 | 챕터 요약들을 바탕으로 작품 전체 줄거리 생성/갱신 |
+| `POST /characters/{id}/summarize` | 기존 요약 없음 | L723 | 인물 특성·관계·대사를 바탕으로 성격·관계·행보를 처음 요약 |
+| `POST /characters/{id}/summarize` | 기존 요약 있음 | L723 | 기존 인물 요약을 유지하면서 새 대사·정보로 갱신 |
+
+**모델**: 모든 엔드포인트에서 `gpt-4o-mini` 사용 (ChatOpenAI).
+**입력 구성**: 인물 요약은 `인물 이름 + 특성 + 메모 + 관계 + 대사(plot) 또는 챕터 본문(novel)` 순으로 조합.
+**기존 요약 갱신**: `existing_summary`는 request body에서 받아 `[기존 요약] ... [최신 정보]` 형식으로 HumanMessage에 주입.
 
 ### Cloud Sync
 

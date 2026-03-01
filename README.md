@@ -408,4 +408,4 @@ plot_editor/
 | 2026-02-26 | 소설 모드(novel) 추가, 기획서 패널, 관계도 PNG 내보내기, 줄 번호 표시, DOCX 서식 개선 |
 | 2026-02-27 | FastAPI 백엔드, Cognito OIDC 인증, DynamoDB + S3 클라우드 동기화, GraphView 레이아웃 저장 |
 | 2026-02-28 | IndexedDB 제거, AWS single-write 패턴 전환, 명시적 Save 버튼 + Cmd+S, 전역 상태 재작성 |
-| 2026-03-01 | 세션 → JWT Bearer 토큰 인증, Character Dialogues 패널, AI 인물 요약 (GPT-4o-mini), 버그 수정 |
+| 2026-03-01 | 세션 → JWT Bearer 토큰 인증, Character Dialogues 패널, AI 인물 요약, AI 플롯 요약, Sidebar 직접 플롯 네비게이션, Work-info 탭 작품 유형별 분기 |
