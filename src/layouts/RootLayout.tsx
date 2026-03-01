@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useStore } from '../store';
-import { setToken } from '../api';
 
 export default function RootLayout() {
   const { sidebarOpen, setSidebarOpen, loadUserInfo, loadWorks } = useStore();
 
-  // On mount: extract JWT token from URL hash (after OAuth callback), then load user info
+  // On mount: load user info and works (token was already extracted in main.tsx)
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.startsWith('#token=')) {
-      setToken(hash.slice(7));
-      window.history.replaceState(null, '', window.location.pathname);
-    }
     loadUserInfo();
     loadWorks();
   }, []);

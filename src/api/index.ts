@@ -312,8 +312,13 @@ export async function apiDeleteRelation(id: number): Promise<void> {
 // ── Community Posts ────────────────────────────────────────────────────────────
 
 function normalizePost(item: any): CommunityPost {
+  // Prefer local_id. If missing (old posts), extract the numeric part from the
+  // composite PK "{sub}#{local_id}" so DELETE /posts/{id} can parse it as int.
+  const resolvedId = item.local_id != null
+    ? String(item.local_id)
+    : String(item.post_id ?? '').split('#').pop() ?? '';
   const base = {
-    id: String(item.local_id ?? item.post_id),
+    id: resolvedId,
     author_sub: item.author_sub ?? '',
     author_name: item.author_name ?? '',
     author_color: item.author_color ?? '#666666',

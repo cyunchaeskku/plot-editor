@@ -28,6 +28,7 @@ export default function ShareModal({ work, episode, plot, onClose, onSuccess }: 
   }
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (!postTitle.trim()) return;
     if (!snapshotResult) {
       setPreviewError('플롯 내용을 파싱할 수 없습니다.');

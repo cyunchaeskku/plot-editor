@@ -1,10 +1,10 @@
 import React from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createHashRouter } from 'react-router-dom';
 import RootLayout from './layouts/RootLayout';
 import EditorPage from './pages/EditorPage';
 import ThreadBoard from './pages/ThreadBoard';
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     element: <RootLayout />,
     children: [
