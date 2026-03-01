@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PostCard from './PostCard';
 import { DUMMY_POSTS } from './dummyData';
 import type { Post } from './dummyData';
@@ -8,17 +9,18 @@ type FeedTab = '광장' | '내 글' | '알림';
 interface ThreadFeedProps {
   selectedPostId: number | null;
   onSelectPost: (post: Post) => void;
+  onExpandPost: (post: Post) => void;
 }
 
-export default function ThreadFeed({ selectedPostId, onSelectPost }: ThreadFeedProps) {
+export default function ThreadFeed({ selectedPostId, onSelectPost, onExpandPost }: ThreadFeedProps) {
   const [activeTab, setActiveTab] = useState<FeedTab>('광장');
   const [searchQuery, setSearchQuery] = useState('');
 
   const tabs: FeedTab[] = ['광장', '내 글', '알림'];
 
   const filteredPosts = DUMMY_POSTS.filter((p) => {
-    if (activeTab === '내 글') return p.author_name === '김소연'; // 더미: 내 글 필터
-    if (activeTab === '알림') return false; // 알림은 별도 처리
+    if (activeTab === '내 글') return p.author_name === '김소연';
+    if (activeTab === '알림') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -32,8 +34,18 @@ export default function ThreadFeed({ selectedPostId, onSelectPost }: ThreadFeedP
 
   return (
     <div className="flex flex-col h-full">
+      {/* Back to editor */}
+      <div className="flex items-center px-3 pt-2 pb-1 flex-shrink-0">
+        <Link
+          to="/"
+          className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#AD1B02] transition-colors"
+        >
+          ← 에디터로
+        </Link>
+      </div>
+
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 px-3 pt-3 flex-shrink-0">
+      <div className="flex border-b border-gray-200 px-3 flex-shrink-0">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -81,6 +93,7 @@ export default function ThreadFeed({ selectedPostId, onSelectPost }: ThreadFeedP
               post={post}
               selected={selectedPostId === post.id}
               onClick={() => onSelectPost(post)}
+              onExpand={() => onExpandPost(post)}
             />
           ))
         )}

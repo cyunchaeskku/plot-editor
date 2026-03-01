@@ -5,21 +5,19 @@ interface PostCardProps {
   post: Post;
   selected: boolean;
   onClick: () => void;
+  onExpand: () => void;
 }
 
 function Avatar({ name, color }: { name: string; color: string }) {
   const initials = name.charAt(0);
   return (
-    <div
-      className="post-avatar"
-      style={{ backgroundColor: color }}
-    >
+    <div className="post-avatar" style={{ backgroundColor: color }}>
       {initials}
     </div>
   );
 }
 
-export default function PostCard({ post, selected, onClick }: PostCardProps) {
+export default function PostCard({ post, selected, onClick, onExpand }: PostCardProps) {
   return (
     <div
       className={`post-card${selected ? ' post-card--selected' : ''}`}
@@ -75,10 +73,10 @@ export default function PostCard({ post, selected, onClick }: PostCardProps) {
           <span>💬 {post.comment_count}</span>
         </div>
         <button
-          className="text-xs text-[#AD1B02] hover:underline"
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          className="text-xs text-[#AD1B02] hover:underline font-medium"
+          onClick={(e) => { e.stopPropagation(); onExpand(); }}
         >
-          자세히 보기
+          자세히 보기 ↗
         </button>
       </div>
     </div>
