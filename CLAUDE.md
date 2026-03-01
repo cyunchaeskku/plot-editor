@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Start
+
+At the beginning of a new conversation, read the most recent file in `work_log/` to catch up on the latest development context before starting any work.
+
 ## Commands
 
 ```bash
