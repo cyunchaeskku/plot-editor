@@ -76,6 +76,17 @@ def _extract_dialogues(nodes: list, target_name: str) -> list[str]:
     return result
 
 
+def _extract_plain_text(nodes: list) -> str:
+    """Recursively extract all text content from TipTap JSON nodes."""
+    parts = []
+    for node in nodes:
+        if node.get("type") == "text":
+            parts.append(node.get("text", ""))
+        elif node.get("content"):
+            parts.append(_extract_plain_text(node["content"]))
+    return "".join(parts)
+
+
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
@@ -521,14 +532,22 @@ async def summarize_character(character_id: int, request: Request):
     char_properties = char_item.get("properties", "{}")
     char_memo = char_item.get("memo", "")
 
-    # Collect all dialogues
+    # Determine work type (plot vs novel)
+    work_item = _works_table.get_item(Key={"work_id": f"{sub}#{work_id}"}).get("Item")
+    work_type = work_item.get("type", "plot") if work_item else "plot"
+
     eps_res = _episodes_table.scan(
         FilterExpression="user_sub = :s AND work_id = :w",
         ExpressionAttributeValues={":s": sub, ":w": work_id},
     )
+    episodes = sorted(eps_res.get("Items", []), key=lambda x: x.get("order_index", 0))
+
     all_dialogues = []
-    for ep in eps_res.get("Items", []):
+    chapter_texts = []
+
+    for ep in episodes:
         ep_local_id = int(ep["local_id"])
+        ep_title = ep.get("title", "")
         plots_res = _plots_table.scan(
             FilterExpression="user_sub = :s AND episode_id = :e",
             ExpressionAttributeValues={":s": sub, ":e": ep_local_id},
@@ -538,7 +557,12 @@ async def summarize_character(character_id: int, request: Request):
             try:
                 obj = _s3.get_object(Bucket=_S3_BUCKET, Key=s3_key)
                 content = json.loads(obj["Body"].read())
-                all_dialogues.extend(_extract_dialogues(content.get("content", []), char_name))
+                if work_type == "novel":
+                    text = _extract_plain_text(content.get("content", []))
+                    if text.strip():
+                        chapter_texts.append(f"[{ep_title}]\n{text.strip()}")
+                else:
+                    all_dialogues.extend(_extract_dialogues(content.get("content", []), char_name))
             except Exception:
                 pass
 
@@ -583,7 +607,9 @@ async def summarize_character(character_id: int, request: Request):
             rel_lines.append(f"{from_name} → {r.get('relation_name', '')} → {to_name}")
         context_parts.append("관계:\n" + "\n".join(rel_lines))
 
-    if all_dialogues:
+    if work_type == "novel" and chapter_texts:
+        context_parts.append("챕터 내용:\n" + "\n\n".join(chapter_texts))
+    elif all_dialogues:
         dialogue_lines = "\n".join(f"- {d}" for d in all_dialogues)
         context_parts.append(f"대사:\n{dialogue_lines}")
 
@@ -616,7 +642,7 @@ async def summarize_character(character_id: int, request: Request):
         HumanMessage(content=user_content),
     ]
     response = await llm.ainvoke(messages)
-    return {"summary": response.content}
+    return {"summary": response.content, "context": context}
 
 
 # ── Character Relations ────────────────────────────────────────────────────

@@ -41,6 +41,8 @@ export default function CharacterDetail() {
   const [dialoguesLoading, setDialoguesLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [llmContext, setLlmContext] = useState('');
+  const [llmContextOpen, setLlmContextOpen] = useState(false);
 
   useEffect(() => {
     if (!char) return;
@@ -97,6 +99,7 @@ export default function CharacterDetail() {
     try {
       const res = await generateCharacterSummary(char.id, aiSummary);
       setAiSummary(res.summary);
+      setLlmContext(res.context ?? '');
       // 생성 즉시 자동 저장
       const propsObj = Object.fromEntries(properties.filter((p) => p.key).map((p) => [p.key, p.value]));
       await updateCharacter(char.id, name, color, JSON.stringify(propsObj), memo, image, res.summary);
@@ -419,6 +422,24 @@ export default function CharacterDetail() {
             </div>
           )}
         </div>
+
+        {/* DEV: LLM context preview */}
+        {llmContext && (
+          <div className="border border-dashed border-amber-300 rounded">
+            <button
+              onClick={() => setLlmContextOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] text-amber-600 bg-amber-50 rounded hover:bg-amber-100"
+            >
+              <span>[DEV] LLM 컨텍스트</span>
+              <span>{llmContextOpen ? '▲' : '▼'}</span>
+            </button>
+            {llmContextOpen && (
+              <pre className="px-2 py-2 text-[10px] text-gray-600 whitespace-pre-wrap break-words bg-white rounded-b overflow-y-auto max-h-64">
+                {llmContext}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

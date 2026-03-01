@@ -260,7 +260,7 @@ export async function fetchCharacterDialogues(characterId: number): Promise<Char
   return apiFetch('GET', `/characters/${characterId}/dialogues`);
 }
 
-export async function generateCharacterSummary(characterId: number, existingSummary = ''): Promise<{ summary: string }> {
+export async function generateCharacterSummary(characterId: number, existingSummary = ''): Promise<{ summary: string; context: string }> {
   return apiFetch('POST', `/characters/${characterId}/summarize`, { existing_summary: existingSummary });
 }
 
