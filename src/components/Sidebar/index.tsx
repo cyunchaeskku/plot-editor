@@ -24,6 +24,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
     toggleWorkExpand, toggleEpisodeExpand,
   } = useStore();
 
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [newWorkInput, setNewWorkInput] = useState(false);
@@ -97,7 +98,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#120806] text-sm select-none overflow-hidden">
+    <div className="relative flex flex-col h-full bg-[#120806] text-sm select-none overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a1208]">
         <button
@@ -112,7 +113,7 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
           <>
             <span className="font-semibold text-gray-300 flex-1 ml-2">작품 목록</span>
             <button
-              onClick={() => setNewWorkInput(true)}
+              onClick={() => { if (!isLoggedIn) { setShowLoginAlert(true); return; } setNewWorkInput(true); }}
               className="text-gray-500 hover:text-[#E88D14] text-lg leading-none"
               title="새 작품"
             >+</button>
@@ -439,6 +440,19 @@ export default function Sidebar({ sidebarOpen, onToggle }: { sidebarOpen: boolea
           </div>
         )}
       </div>
+
+      {/* Login required alert */}
+      {showLoginAlert && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowLoginAlert(false)}>
+          <div className="bg-[#1e0e08] border border-[#3a1a0a] rounded-lg px-5 py-4 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[#f0ddd0] text-sm mb-3">로그인을 먼저 해주세요</p>
+            <button
+              onClick={() => setShowLoginAlert(false)}
+              className="text-xs bg-[#AD1B02] text-white px-4 py-1.5 rounded hover:bg-[#c22202] transition-colors"
+            >확인</button>
+          </div>
+        </div>
+      )}
 
       {/* Login / user info */}
       {sidebarOpen && (
